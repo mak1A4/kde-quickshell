@@ -229,7 +229,7 @@ PanelWindow {
         //   bead: the joining piece is a floating dot instead of a neck
         //   smoothing: fillet radius where bubble, neck and dock meet
         readonly property var styles: ({
-                "neck": { gap: 15, neck: 6, bead: false, smoothing: 9 },
+                "neck": { gap: 12, neck: 3, bead: false, smoothing: 6 },
                 "bridge": { gap: 12, neck: 12, bead: false, smoothing: 15 },
                 "tab": { gap: -3, neck: 0, bead: false, smoothing: 12 },
                 "bead": { gap: 10.5, neck: 3, bead: true, smoothing: 2 }
