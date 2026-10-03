@@ -189,6 +189,21 @@ parameter "reason". Breeze has no `power-profile-*` icons; the applet's are
 
 Not ported: brightness, the lid-action hint, remaining-time display.
 
+## KDE Connect uses the daemon's QML module
+
+`org.kde.kdeconnect` (shipped with kdeconnect, used by Plasma's applet) loads in
+Quickshell: `DevicesModel` filtered to paired and reachable devices, as in the applet,
+plus per-device battery, connectivity (mobile signal) and plugin interfaces created
+through the `*DbusInterfaceFactory` singletons. `PluginChecker` says whether a device has
+a plugin loaded; an action is only offered when it has. Behind `Guarded`.
+
+Actions: ring and browse call the plugin interfaces; SMS starts `kdeconnect-sms`; share
+runs `kdialog` for the file choice and `kdeconnect-cli --share` per file, because a QML
+`FileDialog` would have to be parented to the frame's layer surface.
+
+Not ported: pairing requests, the phone's notifications, remote commands, clipboard
+push, virtual monitor.
+
 ## Real popups never resize while mapped
 
 Resizing a mapped `PopupWindow` at fractional scale leaves the old buffer stretched to

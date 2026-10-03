@@ -7,13 +7,19 @@ Rectangle {
 
     property alias text: label.text
     property string icon: ""
+    // set `raised` for buttons sitting on a surface-coloured card
+    property bool raised: false
 
     signal clicked
 
     implicitWidth: row.implicitWidth + Theme.padding * 2
     implicitHeight: Theme.pillHeight
     radius: Theme.radius
-    color: mouse.containsMouse ? Theme.surfaceHover : Theme.surface
+    color: {
+        if (raised)
+            return mouse.containsMouse ? Theme.surfaceActive : Theme.surfaceHover;
+        return mouse.containsMouse ? Theme.surfaceHover : Theme.surface;
+    }
 
     Behavior on color {
         ColorAnim {}

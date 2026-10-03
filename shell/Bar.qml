@@ -36,6 +36,15 @@ Item {
         Tray {
             Layout.alignment: Qt.AlignHCenter
         }
+
+        // imports KDE Connect's QML module, hence Guarded
+        Guarded {
+            Layout.alignment: Qt.AlignHCenter
+            name: "kde connect"
+            compact: true
+            source: Qt.resolvedUrl("modules/Connect.qml")
+        }
+
         Network {}
         Audio {}
 
