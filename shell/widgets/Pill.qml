@@ -9,6 +9,8 @@ Rectangle {
     property bool highlighted: false
     property bool flat: false
     property bool interactive: true
+    // stays lit while something it opened (a popup) is showing
+    property bool active: false
     readonly property bool hovered: mouse.containsMouse
 
     signal clicked(int button)
@@ -21,7 +23,7 @@ Rectangle {
     color: {
         if (highlighted)
             return Theme.accent;
-        if (interactive && hovered)
+        if (active || (interactive && hovered))
             return Theme.surfaceHover;
         return flat ? "transparent" : Theme.surface;
     }

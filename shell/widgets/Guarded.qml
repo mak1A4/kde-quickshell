@@ -8,6 +8,7 @@ Item {
 
     required property string name
     property alias source: loader.source
+    property alias active: loader.active
     readonly property bool failed: loader.status === Loader.Error
 
     implicitWidth: failed ? error.implicitWidth : loader.implicitWidth
@@ -25,6 +26,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         visible: root.failed
         color: Theme.error
+        padding: Theme.padding
         text: root.name + ": module not loadable"
     }
 }
