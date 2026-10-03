@@ -51,6 +51,11 @@ PanelWindow {
         Tray {}
         Network {}
         Audio {}
-        Battery {}
+
+        // imports PowerDevil's QML modules, hence Guarded
+        Guarded {
+            name: "power"
+            source: Qt.resolvedUrl("modules/Power.qml")
+        }
     }
 }
