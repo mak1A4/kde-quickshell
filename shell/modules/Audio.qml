@@ -63,12 +63,4 @@ BarButton {
             return "audio-volume-high-symbolic";
         }
     }
-
-    Label {
-        Layout.alignment: Qt.AlignHCenter
-        visible: root.available
-        color: root.muted ? Theme.fgDim : Theme.fg
-        font.pixelSize: Theme.fontSizeSmall
-        text: Math.round(root.volume * 100)
-    }
 }

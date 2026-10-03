@@ -27,12 +27,4 @@ BarButton {
         font.bold: true
         text: Qt.formatDateTime(clock.date, "mm")
     }
-
-    Label {
-        Layout.alignment: Qt.AlignHCenter
-        Layout.topMargin: 3
-        color: Theme.fgDim
-        font.pixelSize: Theme.fontSizeSmall
-        text: Qt.formatDateTime(clock.date, "dd.MM")
-    }
 }
