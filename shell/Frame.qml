@@ -206,14 +206,17 @@ PanelWindow {
         }
     }
 
-    // hint for a hovered dock icon: a bubble above it
+    // hint for a hovered dock icon: a bubble above it, with a tail that points
+    // at the icon even where the bubble itself is pushed aside by the screen edge
     Rectangle {
         id: dockHintBubble
 
+        // horizontal centre of the hovered icon, in window coordinates
         property real anchorX: 0
+        readonly property real tail: 12
 
         x: Math.max(Theme.frameBorder + Theme.spacing, Math.min(root.innerRight - Theme.spacing - width, anchorX - width / 2))
-        y: dock.area.y - height - Theme.spacing
+        y: dock.area.y - height - tail
         width: dockHintText.implicitWidth + Theme.padding * 2
         height: dockHintText.implicitHeight + Theme.spacing * 2
         radius: Theme.radius * 2
@@ -227,7 +230,8 @@ PanelWindow {
             }
         }
 
-        Behavior on x {
+        // glide along with the pointer once showing; the tail follows, as it hangs on anchorX
+        Behavior on anchorX {
             enabled: dockHintBubble.visible
 
             Anim {}
@@ -240,6 +244,17 @@ PanelWindow {
                 if (root.dockHint)
                     dockHintBubble.anchorX = root.dockHint.mapToItem(null, root.dockHint.width / 2, 0).x;
             }
+        }
+
+        // the tail: a rounded square on its corner, half tucked behind the bubble
+        Rectangle {
+            x: Math.max(parent.radius, Math.min(parent.width - parent.radius - width, dockHintBubble.anchorX - parent.x - width / 2))
+            y: parent.height - height / 2
+            width: dockHintBubble.tail
+            height: dockHintBubble.tail
+            radius: 3
+            rotation: 45
+            color: parent.color
         }
 
         Hint {
