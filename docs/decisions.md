@@ -2,6 +2,32 @@
 
 Short notes on non-obvious KDE/Wayland choices. Evidence is in `phase0-findings.md`.
 
+## Layout: one full-screen frame surface (Caelestia-style)
+
+`Frame.qml` is a single transparent layer surface covering the screen. It draws the
+border with rounded inner corners, the vertical bar as the border's thick right side, and
+every panel that grows out of them (dock, popouts). Panels are plain items in that one
+surface, which is what makes the concave joins and the animations possible; separate
+windows could not blend into the border.
+
+- **Input:** the surface's input region is only the border ring plus open panels
+  (`mask: Region`, Xor against the window). Verified in the protocol trace: four
+  rectangles when idle. Everything else passes through to the windows underneath.
+- **Reserved space:** a layer surface reserves on one edge only, and this one touches all
+  four, so `Exclusions.qml` adds four invisible, input-less 1 px surfaces with the
+  exclusive zones. Maximized windows end up exactly inside the border.
+- **True fullscreen** windows cover the frame (KWin stacks them above the top layer).
+  Accepted: the stated use is maximized windows.
+- **Popouts** (audio, power) are opened by a bar button via the `Popouts` singleton,
+  which carries the content `Component` so each module keeps its own backend objects.
+  While one is open the click-through hole closes, so a click anywhere outside reaches
+  the frame and dismisses it. No compositor grab is involved.
+- **Dock:** hidden; the bottom border strip is the hover sensor (it is always in the
+  input region), and the panel keeps itself open while hovered, with a 300 ms grace.
+- **Tray menus** are still real popups (`MenuPopup`), opening to the left of the bar.
+
+If the frame ever swallows clicks: `pkill -x qs` from KRunner (Alt+Space).
+
 ## Layer shell is allowed
 
 `zwlr_layer_shell_v1` has a wlroots name but KWin implements it (v5). Quickshell's
@@ -73,14 +99,14 @@ the current desktop shows nothing; zero windows anywhere shows the "or KWin deni
 
 A property named `onSomething` is parsed as a signal handler. Hence `accentFg`.
 
-## The audio mixer uses plasma-pa's models, the bar pill uses Quickshell's PipeWire
+## The audio mixer uses plasma-pa's models, the bar button uses Quickshell's PipeWire
 
 Quickshell's PipeWire service has no port availability, so it lists every node (here 4
 outputs, 3 inputs). Plasma hides devices whose only port is unplugged (3 and 1).
 `org.kde.plasma.private.volume` (plasma-pa) loads in Quickshell and brings the same
 filter model, level meters and `plasmaparc` settings the Plasma applet uses, so
 "raise maximum volume" is shared with Plasma. It is private API tied to the Plasma
-version, hence behind `Guarded`. The pill stays on Quickshell's service so it keeps
+version, hence behind `Guarded`. The bar button stays on Quickshell's service so it keeps
 working if that module ever breaks. Both use the same volume scale.
 
 Not ported: per-device port/profile menus, the microphone test, pinning.
@@ -92,9 +118,9 @@ Not ported: per-device port/profile menus, the microphone test, pinning.
 Plasma's applet uses, so profile changes, peripheral batteries and sleep/lock blocking
 behave identically. Quickshell's UPower service could do profiles and batteries but has
 nothing for inhibitions, and one backend per panel is simpler. Private API, so the whole
-pill is behind `Guarded`; this replaced the Phase 1 UPower battery pill.
+bar button is behind `Guarded`; this replaced the Phase 1 UPower battery pill.
 
-The control objects live in the pill, not the popup: the pill shows their state. A manual
+The control objects live in the bar button, not the panel: the button shows their state. A manual
 block is daemon-side state anyway (it survives the object that requested it).
 
 `PowerProfilesControl.setProfile` takes the profile name; the type info misnames its
@@ -103,12 +129,12 @@ parameter "reason". Breeze has no `power-profile-*` icons; the applet's are
 
 Not ported: brightness, the lid-action hint, remaining-time display.
 
-## Popups have a fixed size
+## Real popups never resize while mapped
 
 Resizing a mapped `PopupWindow` at fractional scale leaves the old buffer stretched to
-the new size and stale (Quickshell 0.3.1, Qt 6.11). Popups get a constant size and
-scroll their content, as Plasma's applets do. Content is created only while the popup is
-open (`Guarded.active`).
+the new size and stale (Quickshell 0.3.1, Qt 6.11). This now only concerns `MenuPopup`,
+which maps once its entries have arrived. Popouts and the dock are items inside the frame
+surface and resize freely.
 
 ## `grabFocus` popups can only be opened from real input
 
