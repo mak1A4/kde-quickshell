@@ -35,6 +35,12 @@ The frame's inner corners are only slightly rounded (`Theme.frameRounding: 7.5`,
 the frame is drawn above windows, so its rounding covers the corners of every maximized
 window. Panels keep their own, larger rounding (`Theme.panelRounding`).
 
+The frame and the exclusion surfaces use the layer-shell namespace `dock`. KWin maps the
+namespace to a window type (`dock`, `desktop`, `notification`, `on-screen-display`, ...;
+anything else is a normal window). As a normal window the shell was hidden by show
+desktop along with everything else; as a dock it stays. The namespace is fixed when the
+surface is created, so changing it needs a restart, not a reload.
+
 If the frame ever swallows clicks: `pkill -x qs` from KRunner (Alt+Space).
 
 ## Frame and panels are one distance-field shape; motion follows Caelestia

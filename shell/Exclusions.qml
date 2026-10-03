@@ -16,7 +16,8 @@ Scope {
         implicitHeight: 1
         color: "transparent"
         mask: Region {}
-        WlrLayershell.namespace: "kde-quickshell-exclusion"
+        // "dock": see Frame.qml
+        WlrLayershell.namespace: "dock"
     }
 
     Edge {

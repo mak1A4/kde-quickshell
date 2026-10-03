@@ -65,7 +65,10 @@ PanelWindow {
     // space is reserved by Exclusions.qml
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"
-    WlrLayershell.namespace: "kde-quickshell-frame"
+    // KWin maps the layer-shell namespace to a window type. "dock" makes this
+    // a panel: it stays when all windows are hidden (show desktop), and window
+    // effects leave it alone. Any other name is a normal window to KWin.
+    WlrLayershell.namespace: "dock"
     WlrLayershell.keyboardFocus: popoutOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
     mask: Region {
