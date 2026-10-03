@@ -15,7 +15,7 @@ PopupWindow {
     anchor.edges: Edges.Bottom | Edges.Right
     anchor.gravity: Edges.Bottom | Edges.Left
     // clear the bar's bottom edge plus a small gap
-    anchor.margins.bottom: -(Theme.barHeight - Theme.pillHeight) / 2 - Theme.spacing
+    anchor.margins.bottom: -(Theme.barHeight - anchorItem.height) / 2 - Theme.spacing
     grabFocus: true
     implicitWidth: Theme.popupWidth
     color: "transparent"
