@@ -26,9 +26,9 @@ windows could not blend into the border.
   input region), and the panel keeps itself open while hovered, with a 300 ms grace.
 - **Tray menus** are still real popups (`MenuPopup`), opening to the left of the bar.
 
-The frame's inner corners are square (`Theme.frameRounding: 0`): the frame is drawn above
-windows, so rounded inner corners cover the corners of every maximized window. Panels
-keep their own rounding (`Theme.panelRounding`).
+The frame's inner corners are only slightly rounded (`Theme.frameRounding: 9`, was 24):
+the frame is drawn above windows, so its rounding covers the corners of every maximized
+window. Panels keep their own, larger rounding (`Theme.panelRounding`).
 
 If the frame ever swallows clicks: `pkill -x qs` from KRunner (Alt+Space).
 
