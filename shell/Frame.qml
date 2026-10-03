@@ -232,7 +232,7 @@ PanelWindow {
                 "neck": { gap: 15, neck: 6, bead: false, smoothing: 9 },
                 "bridge": { gap: 24, neck: 15, bead: false, smoothing: 18 },
                 "tab": { gap: -3, neck: 0, bead: false, smoothing: 12 },
-                "bead": { gap: 21, neck: 4.5, bead: true, smoothing: 3 }
+                "bead": { gap: 10.5, neck: 3, bead: true, smoothing: 2 }
             })
         readonly property var style: styles[Theme.dockHintStyle] ?? styles["neck"]
         readonly property real gap: style.gap
