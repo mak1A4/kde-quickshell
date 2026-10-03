@@ -62,6 +62,36 @@ the current desktop shows nothing; zero windows anywhere shows the "or KWin deni
 
 A property named `onSomething` is parsed as a signal handler. Hence `accentFg`.
 
+## The audio mixer uses plasma-pa's models, the bar pill uses Quickshell's PipeWire
+
+Quickshell's PipeWire service has no port availability, so it lists every node (here 4
+outputs, 3 inputs). Plasma hides devices whose only port is unplugged (3 and 1).
+`org.kde.plasma.private.volume` (plasma-pa) loads in Quickshell and brings the same
+filter model, level meters and `plasmaparc` settings the Plasma applet uses, so
+"raise maximum volume" is shared with Plasma. It is private API tied to the Plasma
+version, hence behind `Guarded`. The pill stays on Quickshell's service so it keeps
+working if that module ever breaks. Both use the same volume scale.
+
+Not ported: per-device port/profile menus, the microphone test, pinning.
+
+## Popups have a fixed size
+
+Resizing a mapped `PopupWindow` at fractional scale leaves the old buffer stretched to
+the new size and stale (Quickshell 0.3.1, Qt 6.11). Popups get a constant size and
+scroll their content, as Plasma's applets do. Content is created only while the popup is
+open (`Guarded.active`).
+
+## `grabFocus` popups can only be opened from real input
+
+A grabbing xdg_popup needs an input serial. Opening one from a timer or at startup fails
+with "Failed to create grabbing popup". Matters for future IPC/shortcut-triggered popups.
+
+## Quickshell only registers directories that are imported statically
+
+A file loaded by URL (`Loader`) cannot see its sibling files unless some statically
+loaded file has `import qs.<that.dir>`. Hence the otherwise unused
+`import qs.modules.audio` in `modules/Audio.qml`.
+
 ## Sizes are multiples of 3 logical px
 
 At scale 1.333, 3 logical px = 4 device px. Other sizes put edges between pixels.
