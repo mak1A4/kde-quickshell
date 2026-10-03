@@ -14,8 +14,8 @@ import qs.widgets
 // (org_kde_plasma_virtual_desktop_management, no grant needed). It exposes no
 // activate call to QML, so switching writes KWin's D-Bus `current` property.
 // Clicking the current desktop toggles KWin's "show desktop": all windows are
-// hidden, and come back exactly as they were on the next click. The "+" under
-// the track appends a desktop (KWin D-Bus `createDesktop`) and switches to it.
+// hidden, and come back exactly as they were on the next click. The ring at
+// the end appends a desktop (KWin D-Bus `createDesktop`) and switches to it.
 // Right click removes a desktop; KWin moves its windows to a neighbour.
 Item {
     id: root
@@ -251,7 +251,8 @@ Item {
         }
     }
 
-    // new desktop
+    // New desktop: always the last dot, a ring in the colour the next desktop
+    // will get. It fills in on hover.
     Item {
         y: Math.max(root.ids.length, 1) * root.cell
         width: root.width
@@ -263,22 +264,34 @@ Item {
         }
 
         Rectangle {
-            anchors.fill: parent
-            radius: height / 2
-            color: Theme.surfaceHover
-            opacity: addHover.hovered ? 1 : 0
+            readonly property color tint: root.colorAt(root.ids.length)
+            property real size: addHover.hovered ? 13.5 : 9
+
+            anchors.centerIn: parent
+            anchors.alignWhenCentered: false
+            width: size
+            height: size
+            radius: size / 2
+            color: addHover.hovered ? tint : "transparent"
+            border.width: 1.5
+            border.color: tint
+            opacity: addHover.hovered ? 1 : 0.6
+
+            Behavior on size {
+                Anim {
+                    kind: Anim.Fade
+                }
+            }
+
+            Behavior on color {
+                ColorAnim {}
+            }
 
             Behavior on opacity {
                 Anim {
                     kind: Anim.Fade
                 }
             }
-        }
-
-        Icon {
-            anchors.centerIn: parent
-            source: "list-add-symbolic"
-            color: addHover.hovered ? Theme.fg : Theme.fgDim
         }
 
         HoverHandler {

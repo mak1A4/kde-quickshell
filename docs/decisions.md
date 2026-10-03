@@ -82,7 +82,7 @@ Clicking the current desktop toggles show desktop through
 notifying). KWin restores the windows exactly, and also ends the mode by itself when a
 window is activated. The capsule is hollow while it is active. Scrolling does not switch desktops (decided 2026-10-04).
 
-The "+" appends a desktop (KWin D-Bus `createDesktop`, empty name so KWin picks
+The ring after the last dot (in the colour the next desktop will get) appends a desktop (KWin D-Bus `createDesktop`, empty name so KWin picks
 "Desktop N") and enters it. Right click removes a desktop (`removeDesktop`) and leaves
 the windows to KWin's standard rule: they keep their position in the list, so they land
 on the desktop that followed, or on the new last one when the last desktop is removed.
