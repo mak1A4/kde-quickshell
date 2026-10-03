@@ -1,3 +1,6 @@
+// QApplication is needed for native (QWidget-styled) tray menus
+//@ pragma UseQApplication
+
 import Quickshell
 import QtQuick
 
