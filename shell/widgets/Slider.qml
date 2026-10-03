@@ -1,13 +1,14 @@
 import QtQuick
 import qs
 
-// Horizontal slider over 0..to. `level` (0..1) is a live signal meter drawn
-// inside the filled part, like Plasma's volume sliders.
+// Horizontal slider over 0..to. With `metered`, the fill is dimmed and `level`
+// (0..1) is drawn inside it as a live signal meter, like Plasma's volume sliders.
 Item {
     id: root
 
     property real value: 0
     property real to: 1
+    property bool metered: false
     property real level: 0
     property real step: 0.05
     property bool dimmed: false
@@ -21,6 +22,21 @@ Item {
 
     implicitWidth: 180
     implicitHeight: 18
+
+    Repeater {
+        model: root.discrete ? root.to + 1 : 0
+
+        Rectangle {
+            required property int index
+
+            anchors.verticalCenter: parent.verticalCenter
+            x: track.x + root.span * index / root.to - width / 2
+            width: 3
+            height: 12
+            radius: 1.5
+            color: Theme.surfaceHover
+        }
+    }
 
     Rectangle {
         id: track
@@ -42,32 +58,17 @@ Item {
         height: 6
         radius: 3
         color: root.dimmed ? Theme.fgDim : Theme.accent
-        opacity: 0.45
+        opacity: root.metered || root.dimmed ? 0.45 : 1
     }
 
     Rectangle {
         anchors.verticalCenter: parent.verticalCenter
         x: track.x
-        visible: !root.dimmed && root.level > 0
+        visible: root.metered && !root.dimmed && root.level > 0
         width: fill.width * Math.min(1, root.level)
         height: 6
         radius: 3
         color: Theme.accent
-    }
-
-    Repeater {
-        model: root.discrete ? root.to + 1 : 0
-
-        Rectangle {
-            required property int index
-
-            anchors.verticalCenter: parent.verticalCenter
-            x: track.x + root.span * index / root.to - width / 2
-            width: 3
-            height: 12
-            radius: 1.5
-            color: Theme.surfaceHover
-        }
     }
 
     // 100% mark, only when the range goes beyond it

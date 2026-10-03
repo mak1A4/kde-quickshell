@@ -102,6 +102,7 @@ ColumnLayout {
             value: root.volume
             to: Math.max(root.maxVolume, root.volume)
             step: root.volumeStep / 100
+            metered: true
             level: meter.available ? meter.volume : 0
             dimmed: root.muted
             onMoved: value => root.pulseObject.volume = Math.round(value * PA.PulseAudio.NormalVolume)
