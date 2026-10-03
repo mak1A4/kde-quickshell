@@ -31,7 +31,7 @@ windows could not blend into the border.
   failed.
 - **Tray menus** are still real popups (`MenuPopup`), opening to the left of the bar.
 
-The frame's inner corners are only slightly rounded (`Theme.frameRounding: 6`, was 24):
+The frame's inner corners are only slightly rounded (`Theme.frameRounding: 7.5`, was 24):
 the frame is drawn above windows, so its rounding covers the corners of every maximized
 window. Panels keep their own, larger rounding (`Theme.panelRounding`).
 
