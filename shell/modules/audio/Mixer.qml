@@ -1,4 +1,3 @@
-import Quickshell
 import QtQuick
 import QtQuick.Layouts
 import org.kde.plasma.private.volume as PA
@@ -17,7 +16,7 @@ Item {
 
     // Fixed size, like Plasma's applet: resizing a mapped popup at fractional
     // scale leaves a stale, stretched frame (Quickshell 0.3.1 / Qt 6.11).
-    implicitWidth: 420
+    implicitWidth: Theme.popupWidth
     implicitHeight: 450
 
     component SectionHeader: RowLayout {
@@ -91,18 +90,9 @@ Item {
         }
         spacing: Theme.spacing
 
-        RowLayout {
-            Label {
-                Layout.fillWidth: true
-                font.pixelSize: 15
-                font.bold: true
-                text: "Audio Volume"
-            }
-
-            IconButton {
-                source: "configure-symbolic"
-                onClicked: Quickshell.execDetached(["kcmshell6", "kcm_pulseaudio"])
-            }
+        PopupHeader {
+            title: "Audio Volume"
+            settingsModule: "kcm_pulseaudio"
         }
 
         RowLayout {

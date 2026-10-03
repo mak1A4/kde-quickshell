@@ -1,4 +1,3 @@
-import Quickshell
 import Quickshell.Services.Pipewire
 import QtQuick
 import qs
@@ -55,38 +54,20 @@ Pill {
         text: root.available ? Math.round(root.volume * 100) + "%" : "no audio"
     }
 
-    PopupWindow {
+    BarPopup {
         id: popup
 
-        anchor.item: root
-        anchor.edges: Edges.Bottom | Edges.Right
-        anchor.gravity: Edges.Bottom | Edges.Left
-        // clear the bar's bottom edge plus a small gap
-        anchor.margins.bottom: -(Theme.barHeight - Theme.pillHeight) / 2 - Theme.spacing
-        // closes on click outside
-        grabFocus: true
-        // must match Mixer.qml; fixed so the popup never resizes while mapped
-        implicitWidth: 420
+        anchorItem: root
+        // must match Mixer.qml
         implicitHeight: 450
-        color: "transparent"
 
-        Rectangle {
-            anchors.fill: parent
-            radius: Theme.radius * 2
-            color: Theme.bg
-            border.width: 1.5
-            border.color: Theme.surface
-
-            // loaded only while open, so level meters and the PulseAudio
-            // connection don't run in the background
-            Guarded {
-                anchors.centerIn: parent
-                name: "audio mixer"
-                active: popup.visible
-                source: Qt.resolvedUrl("audio/Mixer.qml")
-                focus: true
-                Keys.onEscapePressed: popup.visible = false
-            }
+        // loaded only while open, so level meters and the PulseAudio
+        // connection don't run in the background
+        Guarded {
+            anchors.centerIn: parent
+            name: "audio mixer"
+            active: popup.visible
+            source: Qt.resolvedUrl("audio/Mixer.qml")
         }
     }
 }
