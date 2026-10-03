@@ -56,7 +56,7 @@ PanelWindow {
         onPressed: Popouts.close()
     }
 
-    // border with rounded inner corners; the right side is the bar
+    // border, inner corners rounded by Theme.frameRounding; the right side is the bar
     Shape {
         anchors.fill: parent
         preferredRendererType: Shape.CurveRenderer
@@ -97,9 +97,9 @@ PanelWindow {
 
         // vertical centre of the button that opened it, in window coordinates
         property real anchorY: 0
-        // keeps its fillets clear of the frame's own rounded corners
-        readonly property real minY: Theme.frameBorder + Theme.frameRounding * 2
-        readonly property real maxY: root.height - Theme.frameBorder - Theme.frameRounding * 2 - height
+        // keeps its fillets inside the bar's edge and clear of the frame's corners
+        readonly property real minY: Theme.frameBorder + Theme.frameRounding + Theme.panelRounding
+        readonly property real maxY: root.height - Theme.frameBorder - Theme.frameRounding - Theme.panelRounding - height
 
         function track() {
             if (root.popoutOpen)

@@ -16,7 +16,10 @@ Singleton {
 
     // Sizes are multiples of 3 logical px: whole device pixels at scale 1.333
     readonly property int frameBorder: 9
-    readonly property int frameRounding: 24
+    // inner corners of the frame; anything above 0 covers the corners of maximized windows
+    readonly property int frameRounding: 0
+    // corners and fillets of panels growing out of the frame (dock, popouts)
+    readonly property int panelRounding: 24
     readonly property int barWidth: 48
     readonly property int barButton: 36
     readonly property int dockHeight: 60
