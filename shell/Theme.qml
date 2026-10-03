@@ -49,10 +49,10 @@ Singleton {
     readonly property list<real> fadeCurve: [0.34, 0.8, 0.34, 1, 1, 1]
     // How the dock tooltip is joined to the dock (see Frame.qml):
     //   "neck"   - slender neck above the icon
-    //   "bridge" - thick liquid bridge, bubble held further away
+    //   "bridge" - thick liquid bridge
     //   "tab"    - no gap: the bubble sits on the dock like a raised tab
     //   "bead"   - not joined: a small bead bounces between dock and bubble
-    readonly property string dockHintStyle: "bead"
+    readonly property string dockHintStyle: "bridge"
     // time the bead takes to cross from dock to bubble, one way
     readonly property int beadTravel: 600
     // hover time before a hint appears; switching between hints is immediate
