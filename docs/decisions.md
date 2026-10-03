@@ -61,6 +61,19 @@ timing carried over.
 - **Hints** wait `Theme.hintDelay` (400 ms; Noctalia uses 500) before first appearing,
   then switch immediately between items.
 
+## Workspace indicator and show desktop
+
+A track of numbers with one accent pill on the current desktop, after Caelestia's
+indicator: the pill's two ends animate separately (the trailing end 1.5x slower), so it
+stretches while it travels. Desktops with windows get a soft background, merged across
+neighbours. Occupancy comes from an unfiltered `TasksModel` (`VirtualDesktops` role), so
+it needs the window-management grant; windows on all desktops are ignored.
+
+Clicking the current desktop toggles show desktop through
+`org.kde.kwindowsystem` (`KWindowSystem.showingDesktop`, readable, writable and
+notifying). KWin restores the windows exactly, and also ends the mode by itself when a
+window is activated. Scrolling does not switch desktops (decided 2026-10-04).
+
 ## Layer shell is allowed
 
 `zwlr_layer_shell_v1` has a wlroots name but KWin implements it (v5). Quickshell's
