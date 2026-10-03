@@ -15,6 +15,10 @@ Rectangle {
     radius: Theme.radius
     color: mouse.containsMouse ? Theme.surfaceHover : Theme.surface
 
+    Behavior on color {
+        ColorAnim {}
+    }
+
     RowLayout {
         id: row
 

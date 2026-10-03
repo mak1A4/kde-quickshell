@@ -25,7 +25,7 @@ windows could not blend into the border.
 - **Dock:** hidden; the bottom border strip is the hover sensor (it is always in the
   input region), and the panel keeps itself open while hovered, with a 300 ms grace.
 - **Hints:** anything hoverable exposes `hintTitle` / `hintLines` and reports hover to
-  `Popouts.hover()`. The frame shows the hint as a small panel growing out of the bar, or
+  `Popouts.hover()`. The frame shows the hint as a small panel sliding out of the bar, or
   as a bubble above the dock for window icons. Hints are outside the input region and
   give way to an open popout. They are also how a compact `Guarded` error icon says what
   failed.
@@ -36,6 +36,30 @@ the frame is drawn above windows, so its rounding covers the corners of every ma
 window. Panels keep their own, larger rounding (`Theme.panelRounding`).
 
 If the frame ever swallows clicks: `pkill -x qs` from KRunner (Alt+Space).
+
+## Frame and panels are one distance-field shape; motion follows Caelestia
+
+Taken from reading Caelestia's source (`caelestia-dots/shell` at 454f46d). Noctalia was
+also checked, but its current tree is a C++ rewrite, not Quickshell; only its tooltip
+timing carried over.
+
+- **Shape:** `shaders/frame.frag` draws the border and every attached panel as one
+  signed-distance field, merged with a circular smooth-min. The fillet where a panel
+  meets the border forms by itself as the panel slides out, so there are no hand-drawn
+  corner arcs. This is a much reduced version of Caelestia's blob renderer: no spring
+  deformation, no per-pair exclusions, four panel slots passed as uniforms.
+  Rebuild after editing: `/usr/lib/qt6/bin/qsb --qt6 -o frame.frag.qsb frame.frag`
+  (needs `qt6-shadertools`). The compiled `.qsb` is committed.
+- **Slide, not grow:** panels keep their full size and slide out from behind the border
+  (`offset` 1 to 0), clipped at the border, as Caelestia's `offsetScale` does. A hidden
+  panel is dropped from the shader, otherwise it would bulge the border from behind.
+- **Curves** (Material 3 expressive, Caelestia's defaults): movement and resizing use
+  `[0.38, 1.21, 0.22, 1]` over 500 ms, which overshoots slightly and settles; opacity and
+  colour use `[0.34, 0.8, 0.34, 1]` over 200 ms. One place: `Theme` + `widgets/Anim.qml`.
+- **Shadow:** the whole shape casts one soft shadow (`MultiEffect`, blur 15) on the
+  windows below. Caelestia uses 0.7 opacity; here 0.5 (`Theme.shadowOpacity`).
+- **Hints** wait `Theme.hintDelay` (400 ms; Noctalia uses 500) before first appearing,
+  then switch immediately between items.
 
 ## Layer shell is allowed
 

@@ -32,6 +32,10 @@ Rectangle {
         return "transparent";
     }
 
+    Behavior on color {
+        ColorAnim {}
+    }
+
     // separate from the MouseArea so non-interactive buttons report hover too
     HoverHandler {
         id: hover

@@ -1,9 +1,17 @@
 import QtQuick
 import qs
 
-// The one animation curve used for everything that moves.
+// Animation for anything that moves or resizes (the default), or for
+// opacity (`kind: Anim.Fade`). See Theme for the curves.
 NumberAnimation {
-    duration: Theme.animDuration
+    enum Kind {
+        Move,
+        Fade
+    }
+
+    property int kind: Anim.Move
+
+    duration: kind === Anim.Fade ? Theme.fadeDuration : Theme.moveDuration
     easing.type: Easing.BezierSpline
-    easing.bezierCurve: Theme.animCurve
+    easing.bezierCurve: kind === Anim.Fade ? Theme.fadeCurve : Theme.moveCurve
 }

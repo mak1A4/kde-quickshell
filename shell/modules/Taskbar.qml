@@ -72,6 +72,10 @@ RowLayout {
                 return mouse.containsMouse || model.IsActive ? Theme.surfaceHover : "transparent";
             }
 
+            Behavior on color {
+                ColorAnim {}
+            }
+
             Icon {
                 anchors.centerIn: parent
                 implicitWidth: 36

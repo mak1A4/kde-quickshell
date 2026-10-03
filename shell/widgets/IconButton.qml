@@ -15,6 +15,10 @@ Rectangle {
     radius: Theme.radius
     color: checked ? Theme.surface : (mouse.containsMouse ? Theme.surfaceHover : "transparent")
 
+    Behavior on color {
+        ColorAnim {}
+    }
+
     Icon {
         id: icon
 

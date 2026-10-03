@@ -33,6 +33,17 @@ Singleton {
     readonly property int fontSizeSmall: 10
     readonly property int maxTextWidth: 240
 
-    readonly property int animDuration: 400
-    readonly property list<real> animCurve: [0.2, 0, 0, 1, 1, 1]
+    // fillet radius where a panel flows into the frame
+    readonly property int panelSmoothing: 21
+    // drop shadow the frame and its panels cast on the windows below
+    readonly property real shadowOpacity: 0.5
+
+    // Motion, after Caelestia (Material 3 expressive): things that move
+    // overshoot slightly and settle; things that fade or recolour are quick.
+    readonly property int moveDuration: 500
+    readonly property list<real> moveCurve: [0.38, 1.21, 0.22, 1, 1, 1]
+    readonly property int fadeDuration: 200
+    readonly property list<real> fadeCurve: [0.34, 0.8, 0.34, 1, 1, 1]
+    // hover time before a hint appears; switching between hints is immediate
+    readonly property int hintDelay: 400
 }

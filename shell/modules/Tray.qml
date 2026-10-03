@@ -27,6 +27,10 @@ ColumnLayout {
             radius: 9
             color: mouse.containsMouse || menu.visible ? Theme.surfaceHover : "transparent"
 
+            Behavior on color {
+                ColorAnim {}
+            }
+
             IconImage {
                 anchors.centerIn: parent
                 implicitSize: Theme.iconSize

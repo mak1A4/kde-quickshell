@@ -1,21 +1,25 @@
 import Quickshell
 import Quickshell.Wayland
 import QtQuick
-import QtQuick.Shapes
+import QtQuick.Effects
 import qs.widgets
 
 // One transparent surface over the whole screen. It draws the border, the bar
-// on the right, and every panel that grows out of them. Only the border, bar
+// on the right, and every panel that slides out of them. Only the border, bar
 // and open panels take input; the rest passes through to the windows below.
 PanelWindow {
     id: root
 
-    readonly property bool popoutOpen: Popouts.current !== "" && owns(Popouts.anchorItem)
+    readonly property real innerRight: width - Theme.barWidth
+    readonly property bool popoutOpen: Popouts.current !== "" && within(Popouts.anchorItem, bar)
 
-    // hovered item with a hint, split by where it lives; hints yield to popouts
-    readonly property Item hintItem: !popoutOpen && (Popouts.hintItem?.hintTitle ?? "") !== "" ? Popouts.hintItem : null
-    readonly property Item barHint: within(hintItem, bar) ? hintItem : null
-    readonly property Item dockHint: within(hintItem, dock) ? hintItem : null
+    // Hovered item with a hint. A hint waits Theme.hintDelay before it first
+    // appears; once one is showing, moving to another item switches at once.
+    // Hints yield to an open popout.
+    readonly property Item wantedHint: !popoutOpen && (Popouts.hintItem?.hintTitle ?? "") !== "" ? Popouts.hintItem : null
+    property Item shownHint: null
+    readonly property Item barHint: within(shownHint, bar) ? shownHint : null
+    readonly property Item dockHint: within(shownHint, dock) ? shownHint : null
 
     function within(item, ancestor) {
         for (let p = item; p; p = p.parent)
@@ -24,8 +28,32 @@ PanelWindow {
         return false;
     }
 
-    function owns(item) {
-        return within(item, bar);
+    onWantedHintChanged: {
+        if (!wantedHint) {
+            hintShow.stop();
+            hintHide.restart();
+            return;
+        }
+        hintHide.stop();
+        if (shownHint)
+            shownHint = wantedHint;
+        else
+            hintShow.restart();
+    }
+
+    Timer {
+        id: hintShow
+
+        interval: Theme.hintDelay
+        onTriggered: root.shownHint = root.wantedHint
+    }
+
+    // short grace, so crossing the gap between two buttons doesn't close it
+    Timer {
+        id: hintHide
+
+        interval: 120
+        onTriggered: root.shownHint = null
     }
 
     anchors {
@@ -45,15 +73,15 @@ PanelWindow {
         // click anywhere outside the popout reaches us and dismisses it.
         x: Theme.frameBorder
         y: Theme.frameBorder
-        width: root.popoutOpen ? 0 : root.width - Theme.frameBorder - Theme.barWidth
+        width: root.popoutOpen ? 0 : root.innerRight - Theme.frameBorder
         height: root.popoutOpen ? 0 : root.height - Theme.frameBorder * 2
         intersection: Intersection.Xor
 
         Region {
-            x: dock.panel.x
-            y: dock.panel.y
-            width: dock.panel.width
-            height: dock.panel.height
+            x: dock.area.x
+            y: dock.area.y
+            width: dock.area.width
+            height: dock.area.height
             intersection: Intersection.Subtract
         }
     }
@@ -65,24 +93,35 @@ PanelWindow {
         onPressed: Popouts.close()
     }
 
-    // border, inner corners rounded by Theme.frameRounding; the right side is the bar
-    Shape {
+    // Border and panel backgrounds, as one merged shape (see the shader),
+    // with a soft shadow onto the windows below.
+    Item {
         anchors.fill: parent
-        preferredRendererType: Shape.CurveRenderer
+        layer.enabled: true
+        layer.effect: MultiEffect {
+            shadowEnabled: true
+            blurMax: 15
+            shadowColor: Qt.rgba(0, 0, 0, Theme.shadowOpacity)
+        }
 
-        ShapePath {
-            fillColor: Theme.bg
-            strokeWidth: -1
-            fillRule: ShapePath.OddEvenFill
+        ShaderEffect {
+            anchors.fill: parent
+            fragmentShader: Qt.resolvedUrl("file://" + Quickshell.shellPath("shaders/frame.frag.qsb"))
 
-            PathSvg {
-                path: {
-                    const w = root.width, h = root.height, k = Theme.frameRounding;
-                    const l = Theme.frameBorder, t = Theme.frameBorder;
-                    const r = w - Theme.barWidth, b = h - Theme.frameBorder;
-                    return `M0,0 H${w} V${h} H0 Z M${l + k},${t} H${r - k} A${k},${k} 0 0 1 ${r},${t + k} V${b - k} A${k},${k} 0 0 1 ${r - k},${b} H${l + k} A${k},${k} 0 0 1 ${l},${b - k} V${t + k} A${k},${k} 0 0 1 ${l + k},${t} Z`;
-                }
+            readonly property vector2d resolution: Qt.vector2d(width, height)
+            readonly property vector4d inner: {
+                const left = Theme.frameBorder, top = Theme.frameBorder;
+                const right = root.innerRight, bottom = root.height - Theme.frameBorder;
+                return Qt.vector4d((left + right) / 2, (top + bottom) / 2, (right - left) / 2, (bottom - top) / 2);
             }
+            readonly property real innerRadius: Theme.frameRounding
+            readonly property real panelRadius: Theme.panelRounding
+            readonly property real smoothing: Theme.panelSmoothing
+            readonly property color color: Theme.bg
+            readonly property vector4d panel0: dock.blob
+            readonly property vector4d panel1: popout.blob
+            readonly property vector4d panel2: barHintPanel.blob
+            readonly property vector4d panel3: Qt.vector4d(0, 0, 0, 0)
         }
     }
 
@@ -92,47 +131,24 @@ PanelWindow {
         anchors.fill: parent
     }
 
-    AttachedShape {
-        x: popout.x
-        y: popout.y
-        width: popout.width
-        height: popout.height
-        edge: Qt.RightEdge
-    }
-
     // popout of the bar module that asked for one, beside its button
-    Item {
+    SidePanel {
         id: popout
-
-        // vertical centre of the button that opened it, in window coordinates
-        property real anchorY: 0
-        // keeps its fillets inside the bar's edge and clear of the frame's corners
-        readonly property real minY: Theme.frameBorder + Theme.frameRounding + Theme.panelRounding
-        readonly property real maxY: root.height - Theme.frameBorder - Theme.frameRounding - Theme.panelRounding - height
 
         function track() {
             if (root.popoutOpen)
                 anchorY = Popouts.anchorItem.mapToItem(null, 0, Popouts.anchorItem.height / 2).y;
         }
 
-        x: root.width - Theme.barWidth - width
-        y: Math.max(minY, Math.min(maxY, anchorY - height / 2))
-        width: root.popoutOpen ? Theme.popupWidth : 0
-        height: content.item?.implicitHeight ?? 0
-        clip: true
+        edgeX: root.innerRight
+        // keeps the fillets clear of the frame's corners
+        minY: Theme.frameBorder + Theme.frameRounding + Theme.panelSmoothing
+        maxY: root.height - Theme.frameBorder - Theme.frameRounding - Theme.panelSmoothing
+        open: root.popoutOpen
+        contentWidth: Theme.popupWidth
+        contentHeight: content.item?.implicitHeight ?? 0
         focus: root.popoutOpen
         Keys.onEscapePressed: Popouts.close()
-
-        Behavior on width {
-            Anim {}
-        }
-
-        // glide between buttons, but appear in place when opening
-        Behavior on y {
-            enabled: popout.width > 0
-
-            Anim {}
-        }
 
         Connections {
             target: Popouts
@@ -151,50 +167,23 @@ PanelWindow {
         Loader {
             id: content
 
-            // stays loaded until the closing animation has finished
-            active: root.popoutOpen || popout.width > 0
+            // stays loaded until it has slid back in
+            active: root.popoutOpen || !popout.hidden
             sourceComponent: Popouts.content
             width: Theme.popupWidth
-            opacity: root.popoutOpen ? 1 : 0
-
-            Behavior on opacity {
-                Anim {}
-            }
         }
     }
 
-    // hint for a hovered bar button: a small panel growing out of the bar.
-    // Not in the input region; it is only looked at.
-    AttachedShape {
-        x: barHintPanel.x
-        y: barHintPanel.y
-        width: barHintPanel.width
-        height: barHintPanel.height
-        edge: Qt.RightEdge
-    }
-
-    Item {
+    // hint for a hovered bar button. Not in the input region; it is only looked at.
+    SidePanel {
         id: barHintPanel
 
-        property real anchorY: 0
-        readonly property real minY: Theme.frameBorder + Theme.frameRounding + Theme.panelRounding
-        readonly property real maxY: root.height - Theme.frameBorder - Theme.frameRounding - Theme.panelRounding - height
-
-        x: root.width - Theme.barWidth - width
-        y: Math.max(minY, Math.min(maxY, anchorY - height / 2))
-        width: root.barHint ? barHintText.implicitWidth + Theme.padding * 2 + Theme.spacing : 0
-        height: barHintText.implicitHeight + Theme.padding * 2
-        clip: true
-
-        Behavior on width {
-            Anim {}
-        }
-
-        Behavior on y {
-            enabled: barHintPanel.width > 0
-
-            Anim {}
-        }
+        edgeX: root.innerRight
+        minY: popout.minY
+        maxY: popout.maxY
+        open: root.barHint !== null
+        contentWidth: barHintText.implicitWidth + Theme.padding * 2 + Theme.spacing
+        contentHeight: barHintText.implicitHeight + Theme.padding * 2
 
         Connections {
             target: root
@@ -220,8 +209,8 @@ PanelWindow {
 
         property real anchorX: 0
 
-        x: Math.max(Theme.frameBorder + Theme.spacing, Math.min(root.width - Theme.barWidth - Theme.spacing - width, anchorX - width / 2))
-        y: dock.panel.y - height - Theme.spacing
+        x: Math.max(Theme.frameBorder + Theme.spacing, Math.min(root.innerRight - Theme.spacing - width, anchorX - width / 2))
+        y: dock.area.y - height - Theme.spacing
         width: dockHintText.implicitWidth + Theme.padding * 2
         height: dockHintText.implicitHeight + Theme.spacing * 2
         radius: Theme.radius * 2
@@ -230,9 +219,15 @@ PanelWindow {
         visible: opacity > 0
 
         Behavior on opacity {
-            NumberAnimation {
-                duration: 150
+            Anim {
+                kind: Anim.Fade
             }
+        }
+
+        Behavior on x {
+            enabled: dockHintBubble.visible
+
+            Anim {}
         }
 
         Connections {
