@@ -23,4 +23,5 @@ Singleton {
     readonly property int radius: 6
     readonly property int fontSize: 13
     readonly property int maxTextWidth: 240
+    readonly property int popupWidth: 420
 }

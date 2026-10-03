@@ -11,6 +11,8 @@ Item {
     property real level: 0
     property real step: 0.05
     property bool dimmed: false
+    // snap to whole numbers and mark each one
+    property bool discrete: false
 
     signal moved(real value)
 
@@ -53,10 +55,25 @@ Item {
         color: Theme.accent
     }
 
+    Repeater {
+        model: root.discrete ? root.to + 1 : 0
+
+        Rectangle {
+            required property int index
+
+            anchors.verticalCenter: parent.verticalCenter
+            x: track.x + root.span * index / root.to - width / 2
+            width: 3
+            height: 12
+            radius: 1.5
+            color: Theme.surfaceHover
+        }
+    }
+
     // 100% mark, only when the range goes beyond it
     Rectangle {
         anchors.verticalCenter: parent.verticalCenter
-        visible: root.to > 1
+        visible: !root.discrete && root.to > 1
         x: track.x + root.span / root.to - width / 2
         width: 3
         height: 12
@@ -80,7 +97,11 @@ Item {
         property real wheelAccumulator: 0
 
         function update(x) {
-            root.moved(Math.max(0, Math.min(1, (x - handle.width / 2) / root.span)) * root.to);
+            const value = Math.max(0, Math.min(1, (x - handle.width / 2) / root.span)) * root.to;
+            if (!root.discrete)
+                root.moved(value);
+            else if (Math.round(value) !== root.value)
+                root.moved(Math.round(value));
         }
 
         anchors.fill: parent
