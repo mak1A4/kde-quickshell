@@ -69,16 +69,18 @@ timing carried over.
 
 ## Workspace indicator and show desktop
 
-A track of numbers with one accent pill on the current desktop, after Caelestia's
-indicator: the pill's two ends animate separately (the trailing end 1.5x slower), so it
-stretches while it travels. Desktops with windows get a soft background, merged across
-neighbours. Occupancy comes from an unfiltered `TasksModel` (`VirtualDesktops` role), so
-it needs the window-management grant; windows on all desktops are ignored.
+A column of dots, one colour per desktop by position (`Theme.desktopColors`). The current
+desktop is a taller capsule in its colour, after Caelestia's indicator: its two ends
+animate separately (the trailing end 1.5x slower), so it stretches while it travels.
+Desktops with windows are solid dots, empty ones small and faint. Numbers were tried
+first and dropped (2026-10-04). Occupancy comes from an unfiltered `TasksModel`
+(`VirtualDesktops` role), so it needs the window-management grant; windows on all
+desktops are ignored.
 
 Clicking the current desktop toggles show desktop through
 `org.kde.kwindowsystem` (`KWindowSystem.showingDesktop`, readable, writable and
 notifying). KWin restores the windows exactly, and also ends the mode by itself when a
-window is activated. Scrolling does not switch desktops (decided 2026-10-04).
+window is activated. The capsule is hollow while it is active. Scrolling does not switch desktops (decided 2026-10-04).
 
 The "+" appends a desktop (KWin D-Bus `createDesktop`, empty name so KWin picks
 "Desktop N") and enters it. Right click removes a desktop (`removeDesktop`) and leaves

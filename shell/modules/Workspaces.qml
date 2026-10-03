@@ -5,9 +5,10 @@ import org.kde.taskmanager as TaskManager
 import qs
 import qs.widgets
 
-// Virtual desktops as a track of numbers with a sliding pill on the current
-// one (after Caelestia's indicator). Desktops that have windows get a soft
-// background, joined across neighbours.
+// Virtual desktops as a column of dots, one colour per desktop. The current
+// desktop is a taller capsule that slides between positions (after Caelestia's
+// indicator); desktops with windows are solid dots, empty ones small and faint.
+// While "show desktop" is active the capsule is hollow.
 //
 // State comes from libtaskmanager's VirtualDesktopInfo
 // (org_kde_plasma_virtual_desktop_management, no grant needed). It exposes no
@@ -19,27 +20,16 @@ import qs.widgets
 Item {
     id: root
 
-    readonly property int cell: 30
+    readonly property int cell: 21
+
+    function colorAt(index) {
+        return Theme.desktopColors[index % Theme.desktopColors.length];
+    }
     readonly property var ids: info.desktopIds
     readonly property int currentIndex: ids.indexOf(info.currentDesktop)
 
     // desktop id -> true for desktops with at least one window
     property var occupied: ({})
-    // consecutive occupied desktops, as { first, count }
-    readonly property var runs: {
-        const result = [];
-        for (let i = 0; i < ids.length; i++) {
-            if (!occupied[ids[i]])
-                continue;
-            const last = result[result.length - 1];
-            if (last && last.first + last.count === i)
-                last.count++;
-            else
-                result.push({ first: i, count: 1 });
-        }
-        return result;
-    }
-
     function activate(position) {
         if (position < 0 || position >= ids.length)
             return;
@@ -126,30 +116,8 @@ Item {
         color: Theme.error
     }
 
-    Repeater {
-        model: root.runs
-
-        Rectangle {
-            required property var modelData
-
-            y: modelData.first * root.cell
-            width: root.width
-            height: modelData.count * root.cell
-            radius: Math.min(width, height) / 2
-            color: Theme.surface
-
-            Behavior on y {
-                Anim {}
-            }
-
-            Behavior on height {
-                Anim {}
-            }
-        }
-    }
-
-    // The pill. Its two ends move separately: the leading end at normal speed,
-    // the trailing end slower, so it stretches while travelling.
+    // The capsule. Its two ends move separately: the leading end at normal
+    // speed, the trailing end slower, so it stretches while travelling.
     Rectangle {
         id: pill
 
@@ -178,12 +146,26 @@ Item {
             endAnim.start();
         }
 
+        readonly property color tint: root.colorAt(Math.max(0, root.currentIndex))
+
         visible: root.currentIndex >= 0
-        y: start
-        width: root.width
-        height: end - start
-        radius: Math.min(width, height) / 2
-        color: Theme.accent
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: start + 1.5
+        width: 12
+        height: end - start - 3
+        radius: width / 2
+        // hollow while all windows are hidden
+        color: KWindowSystem.showingDesktop ? "transparent" : tint
+        border.width: 3
+        border.color: tint
+
+        Behavior on color {
+            ColorAnim {}
+        }
+
+        Behavior on border.color {
+            ColorAnim {}
+        }
 
         Anim {
             id: startAnim
@@ -219,43 +201,35 @@ Item {
             required property var modelData
             required property int index
             readonly property bool current: index === root.currentIndex
-            readonly property bool showingDesktop: current && KWindowSystem.showingDesktop
             y: index * root.cell
             width: root.width
             height: root.cell
 
-            // hover feedback for the desktops the pill is not on
+            // the dot; the capsule covers it on the current desktop
             Rectangle {
-                anchors.fill: parent
-                radius: height / 2
-                color: Theme.surfaceHover
-                opacity: hover.hovered && !desktop.current ? 1 : 0
+                readonly property bool occupied: root.occupied[desktop.modelData] ?? false
+                property real size: (occupied ? 9 : 6) * (hover.hovered ? 1.5 : 1)
+
+                anchors.centerIn: parent
+                anchors.alignWhenCentered: false
+                visible: !desktop.current
+                width: size
+                height: size
+                radius: size / 2
+                color: root.colorAt(desktop.index)
+                opacity: occupied || hover.hovered ? 1 : 0.4
+
+                Behavior on size {
+                    Anim {
+                        kind: Anim.Fade
+                    }
+                }
 
                 Behavior on opacity {
                     Anim {
                         kind: Anim.Fade
                     }
                 }
-            }
-
-            Label {
-                anchors.centerIn: parent
-                visible: !desktop.showingDesktop
-                color: desktop.current ? Theme.accentFg : (root.occupied[desktop.modelData] ? Theme.fg : Theme.fgDim)
-                font.bold: desktop.current
-                text: desktop.index + 1
-
-                Behavior on color {
-                    ColorAnim {}
-                }
-            }
-
-            // replaces the number while the desktop is showing
-            Icon {
-                anchors.centerIn: parent
-                visible: desktop.showingDesktop
-                source: "user-desktop-symbolic"
-                color: Theme.accentFg
             }
 
             HoverHandler {

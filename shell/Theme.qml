@@ -13,6 +13,8 @@ Singleton {
     readonly property color accentFg: "#1e1e2e"
     readonly property color warning: "#f9e2af"
     readonly property color error: "#f38ba8"
+    // one per virtual desktop, by position, repeating
+    readonly property list<color> desktopColors: ["#89b4fa", "#cba6f7", "#f5c2e7", "#fab387", "#a6e3a1", "#94e2d5", "#f9e2af", "#f38ba8"]
 
     // Sizes are multiples of 3 logical px: whole device pixels at scale 1.333
     readonly property int frameBorder: 9
