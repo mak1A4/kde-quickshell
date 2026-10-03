@@ -10,6 +10,8 @@ ColumnLayout {
     // the hovered item, or null
     required property Item source
 
+    property color titleColor: Theme.fg
+    property color lineColor: Theme.fgDim
     property string title: ""
     property list<string> lines: []
 
@@ -24,6 +26,7 @@ ColumnLayout {
 
     Label {
         Layout.maximumWidth: 360
+        color: root.titleColor
         font.bold: true
         text: root.title
     }
@@ -35,7 +38,7 @@ ColumnLayout {
             required property string modelData
 
             Layout.maximumWidth: 360
-            color: Theme.fgDim
+            color: root.lineColor
             text: modelData
         }
     }

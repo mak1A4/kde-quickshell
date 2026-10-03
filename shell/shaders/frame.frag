@@ -23,12 +23,12 @@ layout(std140, binding = 0) uniform buf {
     vec4 panel0;
     vec4 panel1;
     vec4 panel2;
-    // A tooltip bubble and the neck that joins it to the panel it rose from.
-    // They merge with a tighter fillet, so the neck stays slender.
+    // A tooltip bubble: a separate shape in its own colour, not merged with
+    // the rest, but drawn here so it shares the shadow.
     vec4 bubble;
-    vec4 neck;
     float bubbleRadius;
-    float bubbleSmoothing;
+    vec4 bubbleColor;
+    float bubbleOpacity;
 };
 
 float sdRoundedBox(vec2 p, vec2 center, vec2 halfSize, float radius) {
@@ -58,11 +58,15 @@ void main() {
     d = merge(d, p, panel1, panelRadius, smoothing);
     d = merge(d, p, panel2, panelRadius, smoothing);
 
-    float tip = merge(1e9, p, bubble, bubbleRadius, bubbleSmoothing);
-    tip = merge(tip, p, neck, bubbleRadius, bubbleSmoothing);
-    d = smin(d, tip, bubbleSmoothing);
-
     float fw = fwidth(d);
-    float alpha = 1.0 - smoothstep(-fw, fw, d);
-    fragColor = vec4(color.rgb, 1.0) * color.a * alpha * qt_Opacity;
+    vec4 result = vec4(color.rgb, 1.0) * color.a * (1.0 - smoothstep(-fw, fw, d));
+
+    if (bubble.z > 0.0 && bubble.w > 0.0 && bubbleOpacity > 0.0) {
+        float b = sdRoundedBox(p, bubble.xy, bubble.zw, min(bubbleRadius, min(bubble.z, bubble.w)));
+        float bw = fwidth(b);
+        float cover = (1.0 - smoothstep(-bw, bw, b)) * bubbleColor.a * bubbleOpacity;
+        result = result * (1.0 - cover) + vec4(bubbleColor.rgb, 1.0) * cover;
+    }
+
+    fragColor = result * qt_Opacity;
 }

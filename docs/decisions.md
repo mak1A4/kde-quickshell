@@ -53,8 +53,8 @@ timing carried over.
   signed-distance field, merged with a circular smooth-min. The fillet where a panel
   meets the border forms by itself as the panel slides out, so there are no hand-drawn
   corner arcs. This is a much reduced version of Caelestia's blob renderer: no spring
-  deformation, no per-pair exclusions, three panel slots plus the tooltip pair passed as
-  uniforms.
+  deformation, no per-pair exclusions, three panel slots plus the tooltip bubble passed
+  as uniforms.
   Rebuild after editing: `/usr/lib/qt6/bin/qsb --qt6 -o frame.frag.qsb frame.frag`
   (needs `qt6-shadertools`). The compiled `.qsb` is committed.
 - **Slide, not grow:** panels keep their full size and slide out from behind the border
@@ -65,13 +65,12 @@ timing carried over.
   colour use `[0.34, 0.8, 0.34, 1]` over 200 ms. One place: `Theme` + `widgets/Anim.qml`.
 - **Shadow:** the whole shape casts one soft shadow (`MultiEffect`, blur 15) on the
   windows below. Caelestia uses 0.7 opacity; here 0.5 (`Theme.shadowOpacity`).
-- **Dock tooltip:** also in the shader, as a `bubble` plus a `neck` rectangle that joins
-  it to the dock above the hovered icon. The pair merges with a tighter fillet (9) than
-  panels do, so the neck stays slender; the gap between dock and bubble must stay larger
-  than that fillet or the two fuse along their whole width. The bubble rises out of the
-  dock rather than fading, since a shape in the shader cannot have its own opacity. A
-  separate triangle tail was tried first and looked stuck-on. Four proportions are
-  selectable with `Theme.dockHintStyle`: `neck`, `bridge`, `tab`, `bead`.
+- **Dock tooltip:** a plain bubble 9 px above the hovered icon, in its own colour
+  (`Theme.tooltipBg` / `tooltipFg`, accent by default) so it reads as separate from the
+  dock. The shader draws it as an independent shape (own colour and opacity, not merged),
+  which gives it the shared shadow. Joining it to the dock was tried in several forms and
+  rejected (2026-10-04): a triangle tail, then shader variants `neck`, `bridge`, `tab`
+  and a bouncing `bead`. Those are in git history if ever wanted again.
 - **Hints** wait `Theme.hintDelay` (400 ms; Noctalia uses 500) before first appearing,
   then switch immediately between items.
 

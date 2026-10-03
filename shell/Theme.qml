@@ -14,6 +14,10 @@ Singleton {
     readonly property color accentFg: "#1e1e2e"
     readonly property color warning: "#f9e2af"
     readonly property color error: "#f38ba8"
+    // tooltip above the dock: deliberately not the frame's colour, so it reads
+    // as a separate thing floating over it
+    readonly property color tooltipBg: accent
+    readonly property color tooltipFg: accentFg
     // one per virtual desktop, by position, repeating
     readonly property list<color> desktopColors: ["#89b4fa", "#cba6f7", "#f5c2e7", "#fab387", "#a6e3a1", "#94e2d5", "#f9e2af", "#f38ba8"]
 
@@ -47,14 +51,6 @@ Singleton {
     readonly property list<real> moveCurve: [0.38, 1.21, 0.22, 1, 1, 1]
     readonly property int fadeDuration: 200
     readonly property list<real> fadeCurve: [0.34, 0.8, 0.34, 1, 1, 1]
-    // How the dock tooltip is joined to the dock (see Frame.qml):
-    //   "neck"   - slender neck above the icon
-    //   "bridge" - thick liquid bridge
-    //   "tab"    - no gap: the bubble sits on the dock like a raised tab
-    //   "bead"   - not joined: a small bead bounces between dock and bubble
-    readonly property string dockHintStyle: "neck"
-    // time the bead takes to cross from dock to bubble, one way
-    readonly property int beadTravel: 600
     // hover time before a hint appears; switching between hints is immediate
     readonly property int hintDelay: 400
 }

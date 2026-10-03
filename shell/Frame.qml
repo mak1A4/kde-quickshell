@@ -125,9 +125,9 @@ PanelWindow {
             readonly property vector4d panel1: popout.blob
             readonly property vector4d panel2: barHintPanel.blob
             readonly property vector4d bubble: dockHint.blob
-            readonly property vector4d neck: dockHint.neck
             readonly property real bubbleRadius: 12
-            readonly property real bubbleSmoothing: dockHint.style.smoothing
+            readonly property color bubbleColor: Theme.tooltipBg
+            readonly property real bubbleOpacity: dockHint.opacity
         }
     }
 
@@ -209,86 +209,38 @@ PanelWindow {
         }
     }
 
-    // Hint for a hovered dock icon: a bubble that rises out of the dock above
-    // the icon and stays joined to it by a short neck. Bubble and neck are
-    // drawn by the frame shader (`blob`, `neck`); this item only places the text.
+    // Hint for a hovered dock icon: a bubble in its own colour, floating just
+    // above the dock. The bubble is drawn by the frame shader (`blob`), so it
+    // shares the shadow; this item places the text and carries the fade.
     Item {
         id: dockHint
 
         readonly property bool showing: root.dockHintItem !== null && dock.shown
-        // 0 = still inside the dock, 1 = risen; overshoots a little on the way
-        property real progress: showing ? 1 : 0
         // horizontal centre of the hovered icon, in window coordinates
         property real anchorX: 0
         property real w: dockHintText.implicitWidth + Theme.padding * 2
         readonly property real h: dockHintText.implicitHeight + Theme.spacing * 2
-        // Variants, chosen by Theme.dockHintStyle.
-        //   gap: clear space between dock and bubble. Where it is larger than
-        //        `smoothing` the two stay apart; smaller, and they fuse.
-        //   neck: half width of the joining piece, 0 for none
-        //   bead: the joining piece is a floating dot instead of a neck
-        //   smoothing: fillet radius where bubble, neck and dock meet
-        readonly property var styles: ({
-                "neck": { gap: 12, neck: 3, bead: false, smoothing: 6 },
-                "bridge": { gap: 12, neck: 12, bead: false, smoothing: 15 },
-                "tab": { gap: -3, neck: 0, bead: false, smoothing: 12 },
-                "bead": { gap: 10.5, neck: 3, bead: true, smoothing: 2 }
-            })
-        readonly property var style: styles[Theme.dockHintStyle] ?? styles["neck"]
-        readonly property real gap: style.gap
-        readonly property real neckHalfWidth: style.neck
+        readonly property real gap: 9
+        // it lifts this far into place while fading in
+        property real lift: showing ? 0 : 6
 
-        readonly property vector4d blob: progress > 0 ? Qt.vector4d(x + w / 2, y + h / 2, w / 2, h / 2) : Qt.vector4d(0, 0, 0, 0)
-        readonly property vector4d neck: {
-            if (progress <= 0 || neckHalfWidth <= 0)
-                return Qt.vector4d(0, 0, 0, 0);
-            // a neck runs from inside the bubble's underside to just inside the
-            // dock's top edge; a bead is a dot travelling across the gap, dipping
-            // slightly into each side so it melts into it for a moment
-            const dip = 1.5;
-            const low = dock.area.y - neckHalfWidth + dip;
-            const high = y + h + neckHalfWidth - dip;
-            const middle = low + (high - low) * beadPhase;
-            const top = style.bead ? middle - neckHalfWidth : y + h - neckHalfWidth;
-            const bottom = style.bead ? middle + neckHalfWidth : dock.area.y + neckHalfWidth;
-            if (bottom <= top)
-                return Qt.vector4d(0, 0, 0, 0);
-            // on the icon, but never past the bubble's rounded ends
-            const reach = w / 2 - 12 - neckHalfWidth;
-            const centre = Math.max(x + w / 2 - reach, Math.min(x + w / 2 + reach, anchorX));
-            return Qt.vector4d(centre, (top + bottom) / 2, neckHalfWidth, (bottom - top) / 2);
-        }
+        readonly property vector4d blob: opacity > 0 ? Qt.vector4d(x + w / 2, y + h / 2, w / 2, h / 2) : Qt.vector4d(0, 0, 0, 0)
 
         x: Math.max(Theme.frameBorder + Theme.spacing, Math.min(root.innerRight - Theme.spacing - w, anchorX - w / 2))
-        y: dock.area.y - (gap + h) * progress
+        y: dock.area.y - gap - h + lift
         width: w
         height: h
-        visible: progress > 0
+        opacity: showing ? 1 : 0
+        visible: opacity > 0
 
-        Behavior on progress {
-            Anim {}
+        Behavior on opacity {
+            Anim {
+                kind: Anim.Fade
+            }
         }
 
-        // the bead bounces between dock (0) and bubble (1) for as long as it shows
-        property real beadPhase: 0
-
-        SequentialAnimation on beadPhase {
-            running: dockHint.visible && dockHint.style.bead
-            loops: Animation.Infinite
-
-            NumberAnimation {
-                from: 0
-                to: 1
-                duration: Theme.beadTravel
-                easing.type: Easing.InOutSine
-            }
-
-            NumberAnimation {
-                from: 1
-                to: 0
-                duration: Theme.beadTravel
-                easing.type: Easing.InOutSine
-            }
+        Behavior on lift {
+            Anim {}
         }
 
         // glide along with the pointer once showing
@@ -319,8 +271,8 @@ PanelWindow {
             x: Theme.padding
             y: Theme.spacing
             source: root.dockHintItem
-            // appears once the bubble has mostly risen clear of the dock icons
-            opacity: Math.max(0, Math.min(1, (dockHint.progress - 0.6) / 0.4))
+            titleColor: Theme.tooltipFg
+            lineColor: Qt.alpha(Theme.tooltipFg, 0.75)
         }
     }
 
