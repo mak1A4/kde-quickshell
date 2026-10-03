@@ -13,7 +13,8 @@ import qs.widgets
 // (org_kde_plasma_virtual_desktop_management, no grant needed). It exposes no
 // activate call to QML, so switching writes KWin's D-Bus `current` property.
 // Clicking the current desktop toggles KWin's "show desktop": all windows are
-// hidden, and come back exactly as they were on the next click.
+// hidden, and come back exactly as they were on the next click. The "+" under
+// the track appends a desktop (KWin D-Bus `createDesktop`) and switches to it.
 Item {
     id: root
 
@@ -44,6 +45,22 @@ Item {
         Quickshell.execDetached(["busctl", "--user", "set-property", "org.kde.KWin", "/VirtualDesktopManager", "org.kde.KWin.VirtualDesktopManager", "current", "s", ids[position]]);
     }
 
+    // set by add(); the new desktop is entered once KWin reports it
+    property bool enterNewDesktop: false
+
+    function add() {
+        enterNewDesktop = true;
+        // an empty name lets KWin pick its default ("Desktop N")
+        Quickshell.execDetached(["busctl", "--user", "call", "org.kde.KWin", "/VirtualDesktopManager", "org.kde.KWin.VirtualDesktopManager", "createDesktop", "us", String(ids.length), ""]);
+    }
+
+    onIdsChanged: {
+        if (!enterNewDesktop)
+            return;
+        enterNewDesktop = false;
+        activate(ids.length - 1);
+    }
+
     function refreshOccupied() {
         const result = {};
         for (let i = 0; i < windows.count; i++) {
@@ -58,7 +75,7 @@ Item {
     }
 
     implicitWidth: Theme.barButton
-    implicitHeight: Math.max(ids.length, 1) * cell
+    implicitHeight: (Math.max(ids.length, 1) + 1) * cell
 
     TaskManager.VirtualDesktopInfo {
         id: info
@@ -253,6 +270,53 @@ Item {
                         root.activate(desktop.index);
                 }
             }
+        }
+    }
+
+    // new desktop
+    Item {
+        id: addButton
+
+        readonly property string hintTitle: "New desktop"
+        readonly property list<string> hintLines: ["Adds a desktop and switches to it"]
+
+        y: Math.max(root.ids.length, 1) * root.cell
+        width: root.width
+        height: root.cell
+        visible: info.numberOfDesktops > 0
+
+        Behavior on y {
+            Anim {}
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            radius: height / 2
+            color: Theme.surfaceHover
+            opacity: addHover.hovered ? 1 : 0
+
+            Behavior on opacity {
+                Anim {
+                    kind: Anim.Fade
+                }
+            }
+        }
+
+        Icon {
+            anchors.centerIn: parent
+            source: "list-add-symbolic"
+            color: addHover.hovered ? Theme.fg : Theme.fgDim
+        }
+
+        HoverHandler {
+            id: addHover
+
+            onHoveredChanged: Popouts.hover(addButton, hovered)
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: root.add()
         }
     }
 }
