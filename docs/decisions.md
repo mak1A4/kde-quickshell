@@ -42,10 +42,21 @@ foreground colour instead of the Plasma colour scheme's. It also accepts the `QI
 from `TasksModel.decoration`, which plain `Image` cannot. Kirigami is a hard dependency;
 on Plasma it is always present. Tray icons are pixmaps and use Quickshell's `IconImage`.
 
-## QApplication for tray menus
+## Tray menus are drawn by the shell
 
-`//@ pragma UseQApplication` in `shell.qml` lets `QsMenuAnchor` show tray menus as native
-Breeze menus. Custom-drawn menus (`QsMenuOpener`) are a Phase 2 option.
+`widgets/MenuPopup.qml` reads a tray item's menu through `QsMenuOpener` and draws it in
+the bar's style; submenus are further `MenuPopup`s beside their entry. This replaced
+`QsMenuAnchor` (native Breeze `QMenu`) and with it the `UseQApplication` pragma, which
+nothing else needed.
+
+- Each tray item keeps its opener attached, so entries are loaded before the menu is
+  mapped and the popup never resizes while visible (see "Popups have a fixed size").
+  Submenus are created on first use and map only once their entries have arrived.
+- `Qt.labs.platform` tray icons do not export submenus over DBusMenu. Test with a QWidget
+  `QSystemTrayIcon` (PyQt) instead.
+- Entry icons arrive as pixmaps rendered by the app for its own palette, so a dark-on-light
+  icon stays dark on our dark menu. Not recoloured: they may be full-colour.
+- Mouse only; no keyboard navigation yet.
 
 ## Quickshell service singletons are lazy
 
