@@ -8,7 +8,7 @@ import qs.widgets
 
 // StatusNotifierItem tray. Hidden when no app has registered an item.
 // Left click activates, middle click is the secondary action, right click
-// opens the item's menu as a native platform menu.
+// opens the item's menu, drawn by the shell (widgets/MenuPopup.qml).
 Pill {
     id: root
 
@@ -32,7 +32,7 @@ Pill {
                 else if (event.button === Qt.LeftButton && !modelData.onlyMenu)
                     modelData.activate();
                 else if (modelData.hasMenu)
-                    menu.open();
+                    menu.open = !menu.open;
             }
             onWheel: event => modelData.scroll(event.angleDelta.y, false)
 
@@ -41,13 +41,11 @@ Pill {
                 source: item.modelData.icon
             }
 
-            QsMenuAnchor {
+            MenuPopup {
                 id: menu
 
-                menu: item.modelData.menu
-                anchor.item: item
-                anchor.edges: Edges.Bottom
-                anchor.gravity: Edges.Bottom
+                anchorItem: item
+                handle: item.modelData.menu
             }
         }
     }
