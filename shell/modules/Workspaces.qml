@@ -210,13 +210,6 @@ Item {
             required property int index
             readonly property bool current: index === root.currentIndex
             readonly property bool showingDesktop: current && KWindowSystem.showingDesktop
-            readonly property string hintTitle: info.desktopNames[index] ?? ""
-            readonly property list<string> hintLines: {
-                if (!current)
-                    return root.occupied[modelData] ? ["Has open windows"] : ["Empty"];
-                return showingDesktop ? ["Showing desktop", "Click to bring the windows back"] : ["Current desktop", "Click to show the desktop"];
-            }
-
             y: index * root.cell
             width: root.width
             height: root.cell
@@ -257,8 +250,6 @@ Item {
 
             HoverHandler {
                 id: hover
-
-                onHoveredChanged: Popouts.hover(desktop, hovered)
             }
 
             MouseArea {
@@ -275,11 +266,6 @@ Item {
 
     // new desktop
     Item {
-        id: addButton
-
-        readonly property string hintTitle: "New desktop"
-        readonly property list<string> hintLines: ["Adds a desktop and switches to it"]
-
         y: Math.max(root.ids.length, 1) * root.cell
         width: root.width
         height: root.cell
@@ -310,8 +296,6 @@ Item {
 
         HoverHandler {
             id: addHover
-
-            onHoveredChanged: Popouts.hover(addButton, hovered)
         }
 
         MouseArea {
