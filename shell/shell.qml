@@ -5,10 +5,18 @@ ShellRoot {
     Variants {
         model: Quickshell.screens
 
-        Bar {
-            required property var modelData
+        Scope {
+            id: scope
 
-            screen: modelData
+            required property ShellScreen modelData
+
+            Exclusions {
+                screen: scope.modelData
+            }
+
+            Frame {
+                screen: scope.modelData
+            }
         }
     }
 }

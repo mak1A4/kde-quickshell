@@ -4,9 +4,11 @@ import QtQuick.Layouts
 import qs
 import qs.widgets
 
-// Hidden when no MPRIS player exists. Browsers often show up twice (native +
-// plasma-browser-integration); only one player is shown, so that's harmless.
-Pill {
+// Play/pause for the current MPRIS player; hidden when there is none.
+// Left click toggles, right click is next, middle click is previous.
+// Browsers often show up twice (native + plasma-browser-integration); only
+// one player is used, so that's harmless.
+BarButton {
     id: root
 
     readonly property var players: Mpris.players.values
@@ -23,15 +25,7 @@ Pill {
     }
 
     Icon {
+        Layout.alignment: Qt.AlignHCenter
         source: root.player?.isPlaying ? "media-playback-playing-symbolic" : "media-playback-paused-symbolic"
-    }
-
-    Label {
-        Layout.maximumWidth: Theme.maxTextWidth
-        text: {
-            const title = root.player?.trackTitle || root.player?.identity || "";
-            const artist = root.player?.trackArtist ?? "";
-            return artist ? `${title} · ${artist}` : title;
-        }
     }
 }

@@ -1,31 +1,32 @@
 import QtQuick
+import QtQuick.Layouts
 import org.kde.plasma.private.batterymonitor as BatteryMonitor
 import org.kde.plasma.private.battery as Battery
 import qs
 import qs.widgets
 import qs.modules.power
 
-// Power pill on PowerDevil's own QML modules (the ones Plasma's applet uses).
+// Power button on PowerDevil's own QML modules (the ones Plasma's applet uses).
 // Shows the laptop battery when there is one, the power profile otherwise.
 // Left click opens the panel, middle click toggles the manual sleep block.
-Pill {
+BarButton {
     id: root
 
     readonly property bool hasBattery: batteryModel.hasInternalBatteries
     readonly property bool charging: batteryModel.state === Battery.BatteryControlModel.Charging
 
-    active: popup.visible
+    active: Popouts.current === "power"
     onClicked: button => {
         if (button === Qt.LeftButton)
-            popup.visible = !popup.visible;
+            Popouts.toggle("power", root, panel);
         else if (button === Qt.MiddleButton && inhibitionControl.isManuallyInhibited)
             inhibitionControl.uninhibit();
         else if (button === Qt.MiddleButton)
             inhibitionControl.inhibit("Manually blocked from the bar");
     }
 
-    // These live here, not in the panel: the pill needs their state, and they
-    // must outlive the popup.
+    // These live here, not in the panel: the button needs their state, and
+    // they must outlive the popout.
     BatteryMonitor.PowerProfilesControl {
         id: profilesControl
     }
@@ -39,6 +40,7 @@ Pill {
     }
 
     Icon {
+        Layout.alignment: Qt.AlignHCenter
         // accent while sleep and screen locking are manually blocked
         color: inhibitionControl.isManuallyInhibited ? Theme.accent : Theme.fg
         source: {
@@ -60,19 +62,17 @@ Pill {
     }
 
     Label {
+        Layout.alignment: Qt.AlignHCenter
         visible: root.hasBattery
         color: !root.charging && batteryModel.percent <= 15 ? Theme.error : Theme.fg
-        text: batteryModel.percent + "%"
+        font.pixelSize: Theme.fontSizeSmall
+        text: batteryModel.percent
     }
 
-    BarPopup {
-        id: popup
-
-        anchorItem: root
-        implicitHeight: 390
+    Component {
+        id: panel
 
         PowerPanel {
-            anchors.fill: parent
             profiles: profilesControl
             inhibition: inhibitionControl
             batteries: batteryModel

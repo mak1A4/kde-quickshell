@@ -28,6 +28,9 @@ Item {
             "Touchpad": "input-touchpad-symbolic"
         })
 
+    implicitWidth: Theme.popupWidth
+    implicitHeight: 390
+
     function blockedThings(behaviors) {
         const sleep = behaviors.includes("sleep");
         const idle = behaviors.includes("idle");

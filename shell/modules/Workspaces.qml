@@ -8,7 +8,7 @@ import qs.widgets
 // Virtual desktops. State comes from libtaskmanager's VirtualDesktopInfo
 // (org_kde_plasma_virtual_desktop_management, no grant needed). It exposes no
 // activate call to QML, so switching writes KWin's D-Bus `current` property.
-RowLayout {
+ColumnLayout {
     id: root
 
     spacing: 3
@@ -25,28 +25,31 @@ RowLayout {
     }
 
     // KWin always has at least one desktop, so zero means the backend is down
-    Label {
+    Icon {
+        Layout.alignment: Qt.AlignHCenter
         visible: info.numberOfDesktops === 0
+        source: "data-error"
         color: Theme.error
-        text: "desktops unavailable"
     }
 
     Repeater {
         model: info.desktopIds
 
-        Pill {
+        BarButton {
             id: desktop
 
             required property var modelData
             required property int index
             readonly property bool current: modelData === info.currentDesktop
 
+            implicitHeight: 27
             highlighted: current
             onClicked: root.activate(index)
             // wheel up = previous desktop
             onScrolled: steps => root.activate(info.desktopIds.indexOf(info.currentDesktop) - steps)
 
             Label {
+                Layout.alignment: Qt.AlignHCenter
                 color: desktop.current ? Theme.accentFg : Theme.fg
                 text: desktop.index + 1
             }

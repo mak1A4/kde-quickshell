@@ -14,8 +14,6 @@ Item {
     property int tab: 0
     readonly property real maxVolume: config.raiseMaximumVolume ? PA.PulseAudio.MaximalVolume / PA.PulseAudio.NormalVolume : 1
 
-    // Fixed size, like Plasma's applet: resizing a mapped popup at fractional
-    // scale leaves a stale, stretched frame (Quickshell 0.3.1 / Qt 6.11).
     implicitWidth: Theme.popupWidth
     implicitHeight: 450
 

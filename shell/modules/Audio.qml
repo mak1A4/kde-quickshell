@@ -1,5 +1,6 @@
 import Quickshell.Services.Pipewire
 import QtQuick
+import QtQuick.Layouts
 import qs
 import qs.widgets
 // not used directly: Quickshell only registers directories that something
@@ -7,9 +8,9 @@ import qs.widgets
 import qs.modules.audio
 
 // Default sink volume. Left click opens the mixer, middle click toggles mute,
-// wheel changes volume by 5%. The pill itself only needs Quickshell's PipeWire
-// service; the mixer popup is a port of Plasma's applet (see audio/Mixer.qml).
-Pill {
+// wheel changes volume by 5%. The button itself only needs Quickshell's
+// PipeWire service; the mixer is a port of Plasma's applet (audio/Mixer.qml).
+BarButton {
     id: root
 
     readonly property PwNode sink: Pipewire.defaultAudioSink
@@ -17,10 +18,10 @@ Pill {
     readonly property real volume: available ? sink.audio.volume : 0
     readonly property bool muted: available && sink.audio.muted
 
-    active: popup.visible
+    active: Popouts.current === "audio"
     onClicked: button => {
         if (button === Qt.LeftButton)
-            popup.visible = !popup.visible;
+            Popouts.toggle("audio", root, mixer);
         else if (button === Qt.MiddleButton && available)
             sink.audio.muted = !sink.audio.muted;
     }
@@ -36,7 +37,19 @@ Pill {
         objects: [root.sink]
     }
 
+    // created only while the popout is open, so level meters and the
+    // PulseAudio connection don't run in the background
+    Component {
+        id: mixer
+
+        Guarded {
+            name: "audio mixer"
+            source: Qt.resolvedUrl("audio/Mixer.qml")
+        }
+    }
+
     Icon {
+        Layout.alignment: Qt.AlignHCenter
         color: root.available ? Theme.fg : Theme.error
         source: {
             if (!root.available || root.muted || root.volume === 0)
@@ -50,24 +63,10 @@ Pill {
     }
 
     Label {
-        color: root.available ? (root.muted ? Theme.fgDim : Theme.fg) : Theme.error
-        text: root.available ? Math.round(root.volume * 100) + "%" : "no audio"
-    }
-
-    BarPopup {
-        id: popup
-
-        anchorItem: root
-        // must match Mixer.qml
-        implicitHeight: 450
-
-        // loaded only while open, so level meters and the PulseAudio
-        // connection don't run in the background
-        Guarded {
-            anchors.centerIn: parent
-            name: "audio mixer"
-            active: popup.visible
-            source: Qt.resolvedUrl("audio/Mixer.qml")
-        }
+        Layout.alignment: Qt.AlignHCenter
+        visible: root.available
+        color: root.muted ? Theme.fgDim : Theme.fg
+        font.pixelSize: Theme.fontSizeSmall
+        text: Math.round(root.volume * 100)
     }
 }

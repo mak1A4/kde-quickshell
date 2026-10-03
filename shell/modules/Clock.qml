@@ -1,11 +1,11 @@
 import Quickshell
 import QtQuick
+import QtQuick.Layouts
 import qs
 import qs.widgets
 
-Pill {
+BarButton {
     interactive: false
-    flat: true
 
     SystemClock {
         id: clock
@@ -13,12 +13,24 @@ Pill {
     }
 
     Label {
+        Layout.alignment: Qt.AlignHCenter
+        font.pixelSize: 15
         font.bold: true
-        text: Qt.formatDateTime(clock.date, "HH:mm")
+        text: Qt.formatDateTime(clock.date, "HH")
     }
 
     Label {
+        Layout.alignment: Qt.AlignHCenter
+        font.pixelSize: 15
+        font.bold: true
+        text: Qt.formatDateTime(clock.date, "mm")
+    }
+
+    Label {
+        Layout.alignment: Qt.AlignHCenter
+        Layout.topMargin: 3
         color: Theme.fgDim
-        text: Qt.formatDateTime(clock.date, "ddd d MMM")
+        font.pixelSize: Theme.fontSizeSmall
+        text: Qt.formatDateTime(clock.date, "dd.MM")
     }
 }

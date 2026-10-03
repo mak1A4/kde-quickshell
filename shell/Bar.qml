@@ -1,61 +1,52 @@
-import Quickshell
 import QtQuick
 import QtQuick.Layouts
 import qs.modules
 import qs.widgets
 
-PanelWindow {
-    id: bar
+// Contents of the vertical bar on the frame's right side.
+Item {
+    id: root
 
-    anchors {
-        top: true
-        left: true
-        right: true
-    }
-    implicitHeight: Theme.barHeight
-    color: Theme.bg
-
-    RowLayout {
+    ColumnLayout {
         anchors {
-            left: parent.left
-            leftMargin: Theme.spacing
-            verticalCenter: parent.verticalCenter
-        }
-        spacing: Theme.spacing * 2
-
-        // Workspaces and Taskbar import org.kde.taskmanager, hence Guarded
-        Guarded {
-            name: "desktops"
-            source: Qt.resolvedUrl("modules/Workspaces.qml")
-        }
-
-        Guarded {
-            name: "taskbar"
-            source: Qt.resolvedUrl("modules/Taskbar.qml")
-        }
-    }
-
-    Clock {
-        anchors.centerIn: parent
-    }
-
-    RowLayout {
-        anchors {
-            right: parent.right
-            rightMargin: Theme.spacing
-            verticalCenter: parent.verticalCenter
+            top: parent.top
+            topMargin: Theme.frameBorder + Theme.spacing
+            horizontalCenter: parent.horizontalCenter
         }
         spacing: Theme.spacing
 
+        // imports org.kde.taskmanager, hence Guarded
+        Guarded {
+            Layout.alignment: Qt.AlignHCenter
+            name: "desktops"
+            compact: true
+            source: Qt.resolvedUrl("modules/Workspaces.qml")
+        }
+    }
+
+    ColumnLayout {
+        anchors {
+            bottom: parent.bottom
+            bottomMargin: Theme.frameBorder + Theme.spacing
+            horizontalCenter: parent.horizontalCenter
+        }
+        spacing: 3
+
         Media {}
-        Tray {}
+        Tray {
+            Layout.alignment: Qt.AlignHCenter
+        }
         Network {}
         Audio {}
 
         // imports PowerDevil's QML modules, hence Guarded
         Guarded {
+            Layout.alignment: Qt.AlignHCenter
             name: "power"
+            compact: true
             source: Qt.resolvedUrl("modules/Power.qml")
         }
+
+        Clock {}
     }
 }

@@ -5,11 +5,13 @@ import QtQuick.Layouts
 import qs
 
 // Shell-drawn menu for a QsMenuHandle (tray item menus, i.e. DBusMenu),
-// replacing the native Qt menu. Submenus open as further MenuPopups beside
-// their entry. Toggle with `open`, not `visible`.
-BarPopup {
+// replacing the native Qt menu. It opens to the left of its anchor, as the bar
+// is on the right; submenus are further MenuPopups beside their entry.
+// Toggle with `open`, not `visible`. Closes on click outside or Escape.
+PopupWindow {
     id: root
 
+    required property Item anchorItem
     required property var handle
     property bool submenu: false
     property bool open: false
@@ -20,7 +22,8 @@ BarPopup {
     signal activated
 
     // Entries arrive asynchronously. Mapping only once they are here keeps the
-    // popup from resizing while mapped (see BarPopup).
+    // popup from resizing while mapped, which at fractional scale leaves a
+    // stale, stretched frame (Quickshell 0.3.1 / Qt 6.11).
     visible: open && opener.children.values.length > 0
     onVisibleChanged: {
         if (visible)
@@ -32,16 +35,30 @@ BarPopup {
 
     implicitWidth: Math.max(150, column.implicitWidth) + Theme.spacing * 2
     implicitHeight: column.implicitHeight + Theme.spacing * 2
-    anchor.edges: submenu ? Edges.Top | Edges.Right : Edges.Bottom | Edges.Right
-    anchor.gravity: submenu ? Edges.Bottom | Edges.Right : Edges.Bottom | Edges.Left
-    anchor.margins.bottom: submenu ? 0 : -(Theme.barHeight - anchorItem.height) / 2 - Theme.spacing
-    // a submenu with no room on the right opens on the left instead of covering its entry
-    anchor.adjustment: submenu ? PopupAdjustment.FlipX | PopupAdjustment.SlideY : PopupAdjustment.Slide
+    color: "transparent"
+    grabFocus: true
+    anchor.item: anchorItem
+    anchor.edges: Edges.Top | Edges.Left
+    anchor.gravity: Edges.Bottom | Edges.Left
+    // the root menu clears the bar plus a small gap; submenus touch their parent
+    anchor.margins.left: submenu ? 0 : -(Theme.barWidth - anchorItem.width) / 2 - Theme.spacing
+    // with no room on the left, open on the right instead of covering the anchor
+    anchor.adjustment: PopupAdjustment.FlipX | PopupAdjustment.SlideY
 
     QsMenuOpener {
         id: opener
 
         menu: root.handle
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        radius: Theme.radius * 2
+        color: Theme.bg
+        border.width: 1.5
+        border.color: Theme.surface
+        focus: true
+        Keys.onEscapePressed: root.open = false
     }
 
     ColumnLayout {

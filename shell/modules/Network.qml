@@ -5,8 +5,8 @@ import qs
 import qs.widgets
 
 // Connection state from Quickshell's NetworkManager backend. Wired wins over
-// wifi when both are up.
-Pill {
+// wifi when both are up. Red = no backend, yellow = no (full) internet.
+BarButton {
     id: root
 
     readonly property bool available: Networking.backend !== NetworkBackendType.None
@@ -20,6 +20,7 @@ Pill {
     interactive: false
 
     Icon {
+        Layout.alignment: Qt.AlignHCenter
         color: !root.available ? Theme.error : (root.limited ? Theme.warning : Theme.fg)
         source: {
             if (!root.available)
@@ -37,21 +38,6 @@ Pill {
                 return "network-wireless-signal-weak-symbolic";
             }
             return "network-offline-symbolic";
-        }
-    }
-
-    Label {
-        visible: text !== ""
-        Layout.maximumWidth: Theme.maxTextWidth
-        color: !root.available ? Theme.error : (root.limited ? Theme.warning : Theme.fg)
-        text: {
-            if (!root.available)
-                return "no NetworkManager";
-            if (root.wired)
-                return root.limited ? "limited" : "";
-            if (root.wifi)
-                return root.wifiNetwork?.name ?? "";
-            return "offline";
         }
     }
 }

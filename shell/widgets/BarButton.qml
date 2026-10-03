@@ -2,14 +2,15 @@ import QtQuick
 import QtQuick.Layouts
 import qs
 
+// A cell in the vertical bar. Children stack vertically; give them
+// `Layout.alignment: Qt.AlignHCenter`.
 Rectangle {
     id: root
 
-    default property alias content: row.data
+    default property alias content: column.data
     property bool highlighted: false
-    property bool flat: false
     property bool interactive: true
-    // stays lit while something it opened (a popup) is showing
+    // stays lit while something it opened (a popout) is showing
     property bool active: false
     readonly property bool hovered: mouse.containsMouse
 
@@ -17,22 +18,22 @@ Rectangle {
     // +1 per wheel notch up, -1 per notch down
     signal scrolled(int steps)
 
-    implicitWidth: row.implicitWidth + Theme.padding * 2
-    implicitHeight: Theme.pillHeight
-    radius: Theme.radius
+    implicitWidth: Theme.barButton
+    implicitHeight: Math.max(Theme.barButton, column.implicitHeight + Theme.spacing * 2)
+    radius: 9
     color: {
         if (highlighted)
             return Theme.accent;
         if (active || (interactive && hovered))
             return Theme.surfaceHover;
-        return flat ? "transparent" : Theme.surface;
+        return "transparent";
     }
 
-    RowLayout {
-        id: row
+    ColumnLayout {
+        id: column
 
         anchors.centerIn: parent
-        spacing: Theme.spacing
+        spacing: 0
     }
 
     MouseArea {

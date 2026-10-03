@@ -4,8 +4,10 @@ import org.kde.taskmanager as TaskManager
 import qs
 import qs.widgets
 
-// Windows on the current desktop, from libtaskmanager. Needs KWin to grant
-// org_kde_plasma_window_management (see packaging/kde-quickshell.desktop).
+// Windows on the current desktop, from libtaskmanager, for the dock. Needs
+// KWin to grant org_kde_plasma_window_management (see
+// packaging/kde-quickshell.desktop). Left click activates (or minimizes the
+// active window), middle click closes.
 RowLayout {
     id: root
 
@@ -33,7 +35,7 @@ RowLayout {
 
     // Unfiltered twin, only to tell "this desktop is empty" from "we see no
     // windows at all". libtaskmanager has no "denied" flag, so the latter is
-    // ambiguous and gets a visible hint.
+    // ambiguous and says so.
     TaskManager.TasksModel {
         id: allTasks
 
@@ -44,41 +46,66 @@ RowLayout {
     }
 
     Label {
-        visible: allTasks.count === 0
-        color: Theme.warning
-        text: "no windows (or KWin denied window management)"
+        visible: tasks.count === 0
+        color: allTasks.count === 0 ? Theme.warning : Theme.fgDim
+        text: allTasks.count === 0 ? "No windows (or KWin denied window management)" : "No windows on this desktop"
     }
 
     Repeater {
         model: tasks
 
-        Pill {
+        Rectangle {
             id: task
 
             required property var model
             required property int index
 
-            color: task.model.IsDemandingAttention ? Theme.warning : (task.model.IsActive || hovered ? Theme.surfaceHover : "transparent")
-            opacity: task.model.IsMinimized ? 0.5 : 1
-            onClicked: button => {
-                const modelIndex = tasks.makeModelIndex(task.index);
-                if (button === Qt.MiddleButton)
-                    tasks.requestClose(modelIndex);
-                else if (button === Qt.LeftButton && task.model.IsActive)
-                    tasks.requestToggleMinimized(modelIndex);
-                else if (button === Qt.LeftButton)
-                    tasks.requestActivate(modelIndex);
+            implicitWidth: 48
+            implicitHeight: 48
+            radius: 12
+            opacity: model.IsMinimized ? 0.5 : 1
+            color: {
+                if (model.IsDemandingAttention)
+                    return Theme.warning;
+                return mouse.containsMouse || model.IsActive ? Theme.surfaceHover : "transparent";
             }
 
             Icon {
+                anchors.centerIn: parent
+                implicitWidth: 36
+                implicitHeight: 36
                 source: task.model.decoration
                 colorize: false
             }
 
-            Label {
+            // marks the active window
+            Rectangle {
+                anchors {
+                    horizontalCenter: parent.horizontalCenter
+                    bottom: parent.bottom
+                }
                 visible: task.model.IsActive
-                Layout.maximumWidth: Theme.maxTextWidth
-                text: task.model.display ?? ""
+                width: 12
+                height: 3
+                radius: 1.5
+                color: Theme.accent
+            }
+
+            MouseArea {
+                id: mouse
+
+                anchors.fill: parent
+                hoverEnabled: true
+                acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                onClicked: event => {
+                    const modelIndex = tasks.makeModelIndex(task.index);
+                    if (event.button === Qt.MiddleButton)
+                        tasks.requestClose(modelIndex);
+                    else if (task.model.IsActive)
+                        tasks.requestToggleMinimized(modelIndex);
+                    else
+                        tasks.requestActivate(modelIndex);
+                }
             }
         }
     }
