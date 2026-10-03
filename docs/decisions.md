@@ -74,6 +74,24 @@ working if that module ever breaks. Both use the same volume scale.
 
 Not ported: per-device port/profile menus, the microphone test, pinning.
 
+## Power & Battery uses PowerDevil's QML modules
+
+`org.kde.plasma.private.batterymonitor` (`PowerProfilesControl`, `InhibitionControl`) and
+`org.kde.plasma.private.battery` (`BatteryControlModel`) load in Quickshell and are what
+Plasma's applet uses, so profile changes, peripheral batteries and sleep/lock blocking
+behave identically. Quickshell's UPower service could do profiles and batteries but has
+nothing for inhibitions, and one backend per panel is simpler. Private API, so the whole
+pill is behind `Guarded`; this replaced the Phase 1 UPower battery pill.
+
+The control objects live in the pill, not the popup: the pill shows their state. A manual
+block is daemon-side state anyway (it survives the object that requested it).
+
+`PowerProfilesControl.setProfile` takes the profile name; the type info misnames its
+parameter "reason". Breeze has no `power-profile-*` icons; the applet's are
+`battery-profile-{powersave,balanced,performance}-symbolic`.
+
+Not ported: brightness, the lid-action hint, remaining-time display.
+
 ## Popups have a fixed size
 
 Resizing a mapped `PopupWindow` at fractional scale leaves the old buffer stretched to
@@ -86,11 +104,13 @@ open (`Guarded.active`).
 A grabbing xdg_popup needs an input serial. Opening one from a timer or at startup fails
 with "Failed to create grabbing popup". Matters for future IPC/shortcut-triggered popups.
 
-## Quickshell only registers directories that are imported statically
+## Quickshell only registers directories that something imports
 
-A file loaded by URL (`Loader`) cannot see its sibling files unless some statically
-loaded file has `import qs.<that.dir>`. Hence the otherwise unused
-`import qs.modules.audio` in `modules/Audio.qml`.
+A file loaded by URL (`Loader`) cannot see its sibling files unless a file in an already
+registered directory has `import qs.<that.dir>`. Hence the otherwise unused
+`import qs.modules.audio` in `modules/Audio.qml`. The importing file may itself be
+URL-loaded (`modules/Power.qml` importing `qs.modules.power` works), as long as its own
+directory is registered.
 
 ## Sizes are multiples of 3 logical px
 
