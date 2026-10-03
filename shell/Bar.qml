@@ -47,6 +47,9 @@ Item {
             source: Qt.resolvedUrl("modules/Power.qml")
         }
 
-        Clock {}
+    }
+
+    Clock {
+        anchors.centerIn: parent
     }
 }
