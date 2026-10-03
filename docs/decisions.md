@@ -201,6 +201,12 @@ Actions: ring and browse call the plugin interfaces; SMS starts `kdeconnect-sms`
 runs `kdialog` for the file choice and `kdeconnect-cli --share` per file, because a QML
 `FileDialog` would have to be parented to the frame's layer surface.
 
+The per-device state (battery, signal, plugin checks) lives in the bar module for as
+long as a device is connected, not in the panel. Plugin checks answer asynchronously; a
+panel that asked on opening would open small, then grow and shift once they arrived.
+General rule for popouts: everything that decides the content's size must be known
+before `Popouts.toggle()`.
+
 Not ported: pairing requests, the phone's notifications, remote commands, clipboard
 push, virtual monitor.
 

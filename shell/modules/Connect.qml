@@ -12,15 +12,20 @@ BarButton {
     id: root
 
     readonly property bool anyConnected: deviceModel.count > 0
+    // the per-device state objects below, for the panel
+    property list<QtObject> states: []
     property list<string> summary: []
 
-    function refreshSummary() {
-        const lines = [];
+    function refresh() {
+        const objects = [], lines = [];
         for (let i = 0; i < connected.count; i++) {
             const device = connected.objectAt(i);
-            if (device)
-                lines.push(device.line);
+            if (!device)
+                continue;
+            objects.push(device);
+            lines.push(device.line);
         }
+        states = objects;
         summary = lines;
     }
 
@@ -39,24 +44,47 @@ BarButton {
         displayFilter: KDEConnect.DevicesModel.Paired | KDEConnect.DevicesModel.Reachable
     }
 
-    // one line per device for the hint: name and battery
+    // State of each connected device, kept for as long as it is connected:
+    // the hint needs it, and the panel must find it complete when it opens.
     Instantiator {
         id: connected
 
         model: deviceModel
-        onObjectAdded: root.refreshSummary()
-        onObjectRemoved: root.refreshSummary()
+        onObjectAdded: root.refresh()
+        onObjectRemoved: root.refresh()
 
         QtObject {
+            id: state
+
             required property var model
-            readonly property var battery: KDEConnect.DeviceBatteryDbusInterfaceFactory.create(model.deviceId)
+            readonly property string deviceId: model.deviceId
+            readonly property string name: model.name
+            readonly property string type: model.device.type
+            readonly property var battery: KDEConnect.DeviceBatteryDbusInterfaceFactory.create(deviceId)
+            readonly property var connectivity: KDEConnect.DeviceConnectivityReportDbusInterfaceFactory.create(deviceId)
+            readonly property var canShare: KDEConnect.PluginChecker {
+                device: state.model.device
+                pluginName: "share"
+            }
+            readonly property var canRing: KDEConnect.PluginChecker {
+                device: state.model.device
+                pluginName: "findmyphone"
+            }
+            readonly property var canBrowse: KDEConnect.PluginChecker {
+                device: state.model.device
+                pluginName: "sftp"
+            }
+            readonly property var canSms: KDEConnect.PluginChecker {
+                device: state.model.device
+                pluginName: "sms"
+            }
             readonly property string line: {
                 if (!battery?.hasBattery)
-                    return model.name;
-                return `${model.name} · ${battery.charge}%` + (battery.isCharging ? ", charging" : "");
+                    return name;
+                return `${name} · ${battery.charge}%` + (battery.isCharging ? ", charging" : "");
             }
 
-            onLineChanged: root.refreshSummary()
+            onLineChanged: root.refresh()
         }
     }
 
@@ -64,7 +92,7 @@ BarButton {
         id: panel
 
         ConnectPanel {
-            devices: deviceModel
+            devices: root.states
         }
     }
 
