@@ -3,10 +3,9 @@
 Tested 2026-10-03 on CachyOS, Plasma/KWin 6.7.5 (Wayland), Qt 6.11.2, Quickshell 0.3.1,
 DP-1 2560x1440 @165Hz, scale 1.333.
 
-**Caveat:** Quickshell was not installed and `sudo` needs a password, so all tests ran
-against the official `quickshell-0.3.1-1.1` package (signature verified) extracted to a
-temp dir, not `/usr/bin/quickshell`. Nothing was installed system-wide. Everything below
-should carry over unchanged, but step 4 at the real path is untested (see "To run").
+**Update, same day:** the spike first ran against the official package extracted to a
+temp dir. After `quickshell 0.3.1-1.1` was installed, the grant was re-tested at
+`/usr/bin/quickshell` and works; the portal warning noted below is gone.
 
 ## Verdict
 
@@ -85,8 +84,10 @@ desktop, switching to it and back, and removing it; the bar followed each change
 Click-to-switch in the bar uses the same `current` property but was not clicked by hand.
 
 Alternative found on the way: `VirtualDesktopInfo` from the same `org.kde.taskmanager`
-module returns identical data over the Wayland protocol, needs no grant and no
-subprocess, and also offers `requestActivate` / create / remove. See open questions.
+module returns identical data over the Wayland protocol, with no grant and no subprocess.
+Correction to the first version of this report: in Plasma 6.7 it exposes **no**
+activate / create / remove calls to QML, so it is read-only. Phase 1 reads from it and
+switches desktops through the D-Bus `current` property.
 
 ## Other probes
 
@@ -98,8 +99,7 @@ subprocess, and also offers `requestActivate` / create / remove. See open questi
 - The bar gets rounded corners that the config doesn't draw, most likely from the
   ShapeCorners KWin effect on this machine treating the layer surface like a window.
 - `Failed to register with host portal ... App info not found for 'org.quickshell'` is
-  logged at startup. Expected to be an artefact of the temp-dir install (the package's
-  desktop file isn't in the XDG path); unverified.
+  logged at startup with the temp-dir install only; gone with the real package.
 
 ## Fallback states (both seen on screen)
 
@@ -110,17 +110,13 @@ subprocess, and also offers `requestActivate` / create / remove. See open questi
 ## To run
 
 ```sh
-sudo pacman -S quickshell
 install -Dm644 packaging/kde-quickshell.desktop ~/.local/share/applications/kde-quickshell.desktop
 kbuildsycoca6
 qs -p shell
 ```
 
-## Open questions
+## Open questions (resolved 2026-10-03)
 
-1. Desktops backend for Phase 1: keep D-Bus via `busctl` as the brief says, or switch to
-   `VirtualDesktopInfo` (no subprocesses, already depending on the module)?
-2. Is a per-binary grant acceptable, or do you want a dedicated copy of the binary so
-   only this shell gets window management?
-3. Bring the C++ plugin forward for a proper "access denied" signal, or live with the
-   ambiguous empty state until Phase 3?
+1. Desktops backend: `VirtualDesktopInfo` for state, D-Bus only for switching.
+2. Grant scope: per-binary grant accepted.
+3. "Access denied" detection: stays heuristic until the Phase 3 plugin.

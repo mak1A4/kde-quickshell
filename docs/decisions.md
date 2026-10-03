@@ -21,11 +21,46 @@ Quickshell's own `ToplevelManager` is not an option (KWin has no foreign-topleve
 whatever config it runs and however it was started. Future restricted D-Bus interfaces
 (`ScreenShot2`) go in the same file as `X-KDE-DBUS-Restricted-Interfaces`.
 
+## Virtual desktops: Wayland protocol for state, D-Bus for switching
+
+`VirtualDesktopInfo` (from `org.kde.taskmanager`) gives ids, names and the current
+desktop reactively, with no grant. It has no activate call in QML, so switching runs
+`busctl set-property ... current`. One-shot `busctl` calls are fine; the Phase 0
+`busctl monitor` approach is gone.
+
 ## D-Bus from QML goes through `busctl`
 
-Quickshell has no generic D-Bus client. Pattern: one `busctl monitor` process for
-signals, re-read properties with `--json=short` on change. Good enough for low-frequency
-state (desktops, night light). Anything chatty should move to a C++ plugin.
+Quickshell has no generic D-Bus client. One-shot calls use `Quickshell.execDetached`.
+For state, prefer a Quickshell service or KDE QML module; if neither exists, run one
+`busctl monitor` process and re-read properties with `--json=short` on change (worked in
+Phase 0). Anything chatty should move to a C++ plugin.
+
+## Icons come from the system theme via Kirigami.Icon
+
+`widgets/Icon.qml` wraps `Kirigami.Icon` with `isMask`, so symbolic icons take the bar's
+foreground colour instead of the Plasma colour scheme's. It also accepts the `QIcon`
+from `TasksModel.decoration`, which plain `Image` cannot. Kirigami is a hard dependency;
+on Plasma it is always present. Tray icons are pixmaps and use Quickshell's `IconImage`.
+
+## QApplication for tray menus
+
+`//@ pragma UseQApplication` in `shell.qml` lets `QsMenuAnchor` show tray menus as native
+Breeze menus. Custom-drawn menus (`QsMenuOpener`) are a Phase 2 option.
+
+## Quickshell service singletons are lazy
+
+`SystemTray`, `Mpris`, `Networking`, `UPower` start their D-Bus queries on first access
+and fill in asynchronously. Read them through bindings; an imperative read right after
+first touch sees empty lists.
+
+## Empty desktop vs. no window access
+
+The taskbar keeps a second, unfiltered `TasksModel` purely for its count. Zero windows on
+the current desktop shows nothing; zero windows anywhere shows the "or KWin denied" hint.
+
+## QML naming trap
+
+A property named `onSomething` is parsed as a signal handler. Hence `accentFg`.
 
 ## Sizes are multiples of 3 logical px
 
