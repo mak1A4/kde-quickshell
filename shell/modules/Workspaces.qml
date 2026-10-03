@@ -15,7 +15,7 @@ import qs.widgets
 // Clicking the current desktop toggles KWin's "show desktop": all windows are
 // hidden, and come back exactly as they were on the next click. The "+" under
 // the track appends a desktop (KWin D-Bus `createDesktop`) and switches to it.
-// Right click removes a desktop; its windows move to the one before it.
+// Right click removes a desktop; KWin moves its windows to a neighbour.
 Item {
     id: root
 
@@ -55,35 +55,13 @@ Item {
         Quickshell.execDetached(["busctl", "--user", "call", "org.kde.KWin", "/VirtualDesktopManager", "org.kde.KWin.VirtualDesktopManager", "createDesktop", "us", String(ids.length), ""]);
     }
 
-    // Removes a desktop. Its windows go to the desktop before it (from the
-    // first desktop, to the one after). KWin on its own would send them to the
-    // desktop after it, so they are moved first and the desktop removed a moment
-    // later; if the removal overtakes a move, KWin still rehomes the window.
+    // Removes a desktop. KWin rehomes its windows by its own rule: they stay
+    // at the same position in the list, i.e. on the desktop that followed, or on
+    // the new last desktop when the last one is removed.
     function remove(position) {
         if (ids.length <= 1 || position < 0 || position >= ids.length)
             return;
-        const removed = ids[position];
-        const target = ids[position > 0 ? position - 1 : 1];
-        for (let i = 0; i < windows.count; i++) {
-            const window = windows.objectAt(i);
-            if (!window || window.everywhere || !window.desktops.includes(removed))
-                continue;
-            const rest = window.desktops.filter(id => id !== removed);
-            tasks.requestVirtualDesktops(tasks.makeModelIndex(window.index), rest.length > 0 ? rest : [target]);
-        }
-        if (position === currentIndex)
-            activate(ids.indexOf(target));
-        removal.desktop = removed;
-        removal.restart();
-    }
-
-    Timer {
-        id: removal
-
-        property string desktop
-
-        interval: 150
-        onTriggered: Quickshell.execDetached(["busctl", "--user", "call", "org.kde.KWin", "/VirtualDesktopManager", "org.kde.KWin.VirtualDesktopManager", "removeDesktop", "s", desktop])
+        Quickshell.execDetached(["busctl", "--user", "call", "org.kde.KWin", "/VirtualDesktopManager", "org.kde.KWin.VirtualDesktopManager", "removeDesktop", "s", ids[position]]);
     }
 
     onIdsChanged: {
@@ -132,7 +110,6 @@ Item {
 
         QtObject {
             required property var model
-            required property int index
             readonly property var desktops: model.VirtualDesktops ?? []
             readonly property bool everywhere: model.IsOnAllVirtualDesktops ?? false
 

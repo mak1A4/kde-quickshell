@@ -81,11 +81,10 @@ notifying). KWin restores the windows exactly, and also ends the mode by itself 
 window is activated. Scrolling does not switch desktops (decided 2026-10-04).
 
 The "+" appends a desktop (KWin D-Bus `createDesktop`, empty name so KWin picks
-"Desktop N") and enters it. Right click removes a desktop and sends its windows to the
-desktop *before* it. KWin's own rule on removal is the desktop *after* it, so the windows
-are moved first with `TasksModel.requestVirtualDesktops` and the D-Bus removal follows
-150 ms later; if the removal ever wins the race, KWin still rehomes the window, just to
-the other neighbour. The last remaining desktop cannot be removed.
+"Desktop N") and enters it. Right click removes a desktop (`removeDesktop`) and leaves
+the windows to KWin's standard rule: they keep their position in the list, so they land
+on the desktop that followed, or on the new last one when the last desktop is removed.
+The last remaining desktop cannot be removed.
 
 ## Layer shell is allowed
 
