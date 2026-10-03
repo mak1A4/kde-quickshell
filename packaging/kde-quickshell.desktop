@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Quickshell (KDE shell)
+Exec=/usr/bin/quickshell
+NoDisplay=true
+X-KDE-Wayland-Interfaces=org_kde_plasma_window_management
