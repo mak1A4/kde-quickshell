@@ -19,7 +19,7 @@ PanelWindow {
     readonly property Item wantedHint: !popoutOpen && (Popouts.hintItem?.hintTitle ?? "") !== "" ? Popouts.hintItem : null
     property Item shownHint: null
     readonly property Item barHint: within(shownHint, bar) ? shownHint : null
-    readonly property Item dockHint: within(shownHint, dock) ? shownHint : null
+    readonly property Item dockHintItem: within(shownHint, dock) ? shownHint : null
 
     function within(item, ancestor) {
         for (let p = item; p; p = p.parent)
@@ -124,7 +124,10 @@ PanelWindow {
             readonly property vector4d panel0: dock.blob
             readonly property vector4d panel1: popout.blob
             readonly property vector4d panel2: barHintPanel.blob
-            readonly property vector4d panel3: Qt.vector4d(0, 0, 0, 0)
+            readonly property vector4d bubble: dockHint.blob
+            readonly property vector4d neck: dockHint.neck
+            readonly property real bubbleRadius: 12
+            readonly property real bubbleSmoothing: 9
         }
     }
 
@@ -206,33 +209,56 @@ PanelWindow {
         }
     }
 
-    // hint for a hovered dock icon: a bubble above it, with a tail that points
-    // at the icon even where the bubble itself is pushed aside by the screen edge
-    Rectangle {
-        id: dockHintBubble
+    // Hint for a hovered dock icon: a bubble that rises out of the dock above
+    // the icon and stays joined to it by a short neck. Bubble and neck are
+    // drawn by the frame shader (`blob`, `neck`); this item only places the text.
+    Item {
+        id: dockHint
 
+        readonly property bool showing: root.dockHintItem !== null && dock.shown
+        // 0 = still inside the dock, 1 = risen; overshoots a little on the way
+        property real progress: showing ? 1 : 0
         // horizontal centre of the hovered icon, in window coordinates
         property real anchorX: 0
-        readonly property real tail: 12
+        property real w: dockHintText.implicitWidth + Theme.padding * 2
+        readonly property real h: dockHintText.implicitHeight + Theme.spacing * 2
+        // clear space between dock and bubble; must exceed the shader's
+        // bubbleSmoothing, or the two would fuse along their whole width
+        readonly property real gap: 15
+        readonly property real neckHalfWidth: 6
 
-        x: Math.max(Theme.frameBorder + Theme.spacing, Math.min(root.innerRight - Theme.spacing - width, anchorX - width / 2))
-        y: dock.area.y - height - tail
-        width: dockHintText.implicitWidth + Theme.padding * 2
-        height: dockHintText.implicitHeight + Theme.spacing * 2
-        radius: Theme.radius * 2
-        color: Theme.bg
-        opacity: root.dockHint && dock.shown ? 1 : 0
-        visible: opacity > 0
-
-        Behavior on opacity {
-            Anim {
-                kind: Anim.Fade
-            }
+        readonly property vector4d blob: progress > 0 ? Qt.vector4d(x + w / 2, y + h / 2, w / 2, h / 2) : Qt.vector4d(0, 0, 0, 0)
+        readonly property vector4d neck: {
+            // from inside the bubble's underside to just inside the dock's top edge
+            const top = y + h - neckHalfWidth;
+            const bottom = dock.area.y + neckHalfWidth;
+            if (progress <= 0 || bottom <= top)
+                return Qt.vector4d(0, 0, 0, 0);
+            // on the icon, but never past the bubble's rounded ends
+            const reach = w / 2 - 12 - neckHalfWidth;
+            const centre = Math.max(x + w / 2 - reach, Math.min(x + w / 2 + reach, anchorX));
+            return Qt.vector4d(centre, (top + bottom) / 2, neckHalfWidth, (bottom - top) / 2);
         }
 
-        // glide along with the pointer once showing; the tail follows, as it hangs on anchorX
+        x: Math.max(Theme.frameBorder + Theme.spacing, Math.min(root.innerRight - Theme.spacing - w, anchorX - w / 2))
+        y: dock.area.y - (gap + h) * progress
+        width: w
+        height: h
+        visible: progress > 0
+
+        Behavior on progress {
+            Anim {}
+        }
+
+        // glide along with the pointer once showing
         Behavior on anchorX {
-            enabled: dockHintBubble.visible
+            enabled: dockHint.visible
+
+            Anim {}
+        }
+
+        Behavior on w {
+            enabled: dockHint.visible
 
             Anim {}
         }
@@ -240,21 +266,10 @@ PanelWindow {
         Connections {
             target: root
 
-            function onDockHintChanged() {
-                if (root.dockHint)
-                    dockHintBubble.anchorX = root.dockHint.mapToItem(null, root.dockHint.width / 2, 0).x;
+            function onDockHintItemChanged() {
+                if (root.dockHintItem)
+                    dockHint.anchorX = root.dockHintItem.mapToItem(null, root.dockHintItem.width / 2, 0).x;
             }
-        }
-
-        // the tail: a rounded square on its corner, half tucked behind the bubble
-        Rectangle {
-            x: Math.max(parent.radius, Math.min(parent.width - parent.radius - width, dockHintBubble.anchorX - parent.x - width / 2))
-            y: parent.height - height / 2
-            width: dockHintBubble.tail
-            height: dockHintBubble.tail
-            radius: 3
-            rotation: 45
-            color: parent.color
         }
 
         Hint {
@@ -262,7 +277,9 @@ PanelWindow {
 
             x: Theme.padding
             y: Theme.spacing
-            source: root.dockHint
+            source: root.dockHintItem
+            // appears once the bubble has mostly risen clear of the dock icons
+            opacity: Math.max(0, Math.min(1, (dockHint.progress - 0.6) / 0.4))
         }
     }
 

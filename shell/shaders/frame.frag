@@ -23,7 +23,12 @@ layout(std140, binding = 0) uniform buf {
     vec4 panel0;
     vec4 panel1;
     vec4 panel2;
-    vec4 panel3;
+    // A tooltip bubble and the neck that joins it to the panel it rose from.
+    // They merge with a tighter fillet, so the neck stays slender.
+    vec4 bubble;
+    vec4 neck;
+    float bubbleRadius;
+    float bubbleSmoothing;
 };
 
 float sdRoundedBox(vec2 p, vec2 center, vec2 halfSize, float radius) {
@@ -37,11 +42,11 @@ float smin(float a, float b, float k) {
     return max(k, min(a, b)) - length(max(vec2(k) - vec2(a, b), vec2(0.0)));
 }
 
-float merge(float d, vec2 p, vec4 panel) {
+float merge(float d, vec2 p, vec4 panel, float maxRadius, float k) {
     if (panel.z <= 0.0 || panel.w <= 0.0)
         return d;
-    float radius = min(panelRadius, min(panel.z, panel.w));
-    return smin(d, sdRoundedBox(p, panel.xy, panel.zw, radius), smoothing);
+    float radius = min(maxRadius, min(panel.z, panel.w));
+    return smin(d, sdRoundedBox(p, panel.xy, panel.zw, radius), k);
 }
 
 void main() {
@@ -49,10 +54,13 @@ void main() {
 
     // the border is everything outside the hole
     float d = -sdRoundedBox(p, inner.xy, inner.zw, innerRadius);
-    d = merge(d, p, panel0);
-    d = merge(d, p, panel1);
-    d = merge(d, p, panel2);
-    d = merge(d, p, panel3);
+    d = merge(d, p, panel0, panelRadius, smoothing);
+    d = merge(d, p, panel1, panelRadius, smoothing);
+    d = merge(d, p, panel2, panelRadius, smoothing);
+
+    float tip = merge(1e9, p, bubble, bubbleRadius, bubbleSmoothing);
+    tip = merge(tip, p, neck, bubbleRadius, bubbleSmoothing);
+    d = smin(d, tip, bubbleSmoothing);
 
     float fw = fwidth(d);
     float alpha = 1.0 - smoothstep(-fw, fw, d);
