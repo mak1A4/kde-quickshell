@@ -52,7 +52,7 @@ Singleton {
     //   "bridge" - thick liquid bridge
     //   "tab"    - no gap: the bubble sits on the dock like a raised tab
     //   "bead"   - not joined: a small bead bounces between dock and bubble
-    readonly property string dockHintStyle: "bridge"
+    readonly property string dockHintStyle: "neck"
     // time the bead takes to cross from dock to bubble, one way
     readonly property int beadTravel: 600
     // hover time before a hint appears; switching between hints is immediate
