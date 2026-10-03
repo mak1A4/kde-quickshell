@@ -70,7 +70,8 @@ timing carried over.
   panels do, so the neck stays slender; the gap between dock and bubble must stay larger
   than that fillet or the two fuse along their whole width. The bubble rises out of the
   dock rather than fading, since a shape in the shader cannot have its own opacity. A
-  separate triangle tail was tried first and looked stuck-on.
+  separate triangle tail was tried first and looked stuck-on. Four proportions are
+  selectable with `Theme.dockHintStyle`: `neck`, `bridge`, `tab`, `bead`.
 - **Hints** wait `Theme.hintDelay` (400 ms; Noctalia uses 500) before first appearing,
   then switch immediately between items.
 

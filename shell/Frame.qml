@@ -127,7 +127,7 @@ PanelWindow {
             readonly property vector4d bubble: dockHint.blob
             readonly property vector4d neck: dockHint.neck
             readonly property real bubbleRadius: 12
-            readonly property real bubbleSmoothing: 9
+            readonly property real bubbleSmoothing: dockHint.style.smoothing
         }
     }
 
@@ -222,17 +222,32 @@ PanelWindow {
         property real anchorX: 0
         property real w: dockHintText.implicitWidth + Theme.padding * 2
         readonly property real h: dockHintText.implicitHeight + Theme.spacing * 2
-        // clear space between dock and bubble; must exceed the shader's
-        // bubbleSmoothing, or the two would fuse along their whole width
-        readonly property real gap: 15
-        readonly property real neckHalfWidth: 6
+        // Variants, chosen by Theme.dockHintStyle.
+        //   gap: clear space between dock and bubble. Where it is larger than
+        //        `smoothing` the two stay apart; smaller, and they fuse.
+        //   neck: half width of the joining piece, 0 for none
+        //   bead: the joining piece is a floating dot instead of a neck
+        //   smoothing: fillet radius where bubble, neck and dock meet
+        readonly property var styles: ({
+                "neck": { gap: 15, neck: 6, bead: false, smoothing: 9 },
+                "bridge": { gap: 24, neck: 15, bead: false, smoothing: 18 },
+                "tab": { gap: -3, neck: 0, bead: false, smoothing: 12 },
+                "bead": { gap: 21, neck: 4.5, bead: true, smoothing: 3 }
+            })
+        readonly property var style: styles[Theme.dockHintStyle] ?? styles["neck"]
+        readonly property real gap: style.gap
+        readonly property real neckHalfWidth: style.neck
 
         readonly property vector4d blob: progress > 0 ? Qt.vector4d(x + w / 2, y + h / 2, w / 2, h / 2) : Qt.vector4d(0, 0, 0, 0)
         readonly property vector4d neck: {
-            // from inside the bubble's underside to just inside the dock's top edge
-            const top = y + h - neckHalfWidth;
-            const bottom = dock.area.y + neckHalfWidth;
-            if (progress <= 0 || bottom <= top)
+            if (progress <= 0 || neckHalfWidth <= 0)
+                return Qt.vector4d(0, 0, 0, 0);
+            // a neck runs from inside the bubble's underside to just inside the
+            // dock's top edge; a bead is a dot halfway across the gap
+            const middle = (y + h + dock.area.y) / 2;
+            const top = style.bead ? middle - neckHalfWidth : y + h - neckHalfWidth;
+            const bottom = style.bead ? middle + neckHalfWidth : dock.area.y + neckHalfWidth;
+            if (bottom <= top)
                 return Qt.vector4d(0, 0, 0, 0);
             // on the icon, but never past the bubble's rounded ends
             const reach = w / 2 - 12 - neckHalfWidth;
