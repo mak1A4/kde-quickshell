@@ -1,6 +1,7 @@
 import Quickshell
 import QtQuick
 import QtQuick.Layouts
+import org.kde.kwindowsystem
 import org.kde.taskmanager as TaskManager
 import qs
 import qs.widgets
@@ -8,6 +9,8 @@ import qs.widgets
 // Virtual desktops. State comes from libtaskmanager's VirtualDesktopInfo
 // (org_kde_plasma_virtual_desktop_management, no grant needed). It exposes no
 // activate call to QML, so switching writes KWin's D-Bus `current` property.
+// Clicking the current desktop toggles KWin's "show desktop": all windows are
+// hidden, and come back exactly as they were on the next click.
 ColumnLayout {
     id: root
 
@@ -45,15 +48,33 @@ ColumnLayout {
             implicitHeight: 27
             highlighted: current
             hintTitle: info.desktopNames[index] ?? ""
-            hintLines: current ? ["Current desktop"] : []
-            onClicked: root.activate(index)
+            hintLines: {
+                if (!current)
+                    return [];
+                return KWindowSystem.showingDesktop ? ["Showing desktop", "Click to bring the windows back"] : ["Current desktop", "Click to show the desktop"];
+            }
+            onClicked: {
+                if (current)
+                    KWindowSystem.showingDesktop = !KWindowSystem.showingDesktop;
+                else
+                    root.activate(index);
+            }
             // wheel up = previous desktop
             onScrolled: steps => root.activate(info.desktopIds.indexOf(info.currentDesktop) - steps)
 
             Label {
                 Layout.alignment: Qt.AlignHCenter
+                visible: !(desktop.current && KWindowSystem.showingDesktop)
                 color: desktop.current ? Theme.accentFg : Theme.fg
                 text: desktop.index + 1
+            }
+
+            // replaces the number while the desktop is showing
+            Icon {
+                Layout.alignment: Qt.AlignHCenter
+                visible: desktop.current && KWindowSystem.showingDesktop
+                source: "user-desktop-symbolic"
+                color: Theme.accentFg
             }
         }
     }
