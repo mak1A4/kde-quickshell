@@ -97,6 +97,10 @@ loaded file has `import qs.<that.dir>`. Hence the otherwise unused
 At scale 1.333, 3 logical px = 4 device px. Other sizes put edges between pixels.
 `screen.devicePixelRatio` reports 2 here and must not be used for this.
 
+Centre anchors snap to whole logical pixels by default, which undoes this for odd
+offsets (a 9 px dot in an 18 px ring sits at 4.5). Set `anchors.alignWhenCentered: false`
+where the half-pixel offset is intended.
+
 ## Optional KDE modules are loaded through `Loader`
 
 A failed `import` kills the whole file. Widgets that import KDE modules live in their own

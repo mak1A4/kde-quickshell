@@ -68,6 +68,7 @@ Item {
         id: handle
 
         anchors.verticalCenter: parent.verticalCenter
+        anchors.alignWhenCentered: false
         x: root.span * root.fraction
         width: 15
         height: 15

@@ -48,6 +48,9 @@ ColumnLayout {
 
             Rectangle {
                 anchors.centerIn: parent
+                // the 4.5 px offset is exact in device pixels at scale 1.333;
+                // the default snaps it to a whole logical pixel, off-centre
+                anchors.alignWhenCentered: false
                 visible: root.isDefault
                 width: 9
                 height: 9
