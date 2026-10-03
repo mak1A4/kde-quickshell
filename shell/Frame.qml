@@ -243,8 +243,12 @@ PanelWindow {
             if (progress <= 0 || neckHalfWidth <= 0)
                 return Qt.vector4d(0, 0, 0, 0);
             // a neck runs from inside the bubble's underside to just inside the
-            // dock's top edge; a bead is a dot halfway across the gap
-            const middle = (y + h + dock.area.y) / 2;
+            // dock's top edge; a bead is a dot travelling across the gap, dipping
+            // slightly into each side so it melts into it for a moment
+            const dip = 1.5;
+            const low = dock.area.y - neckHalfWidth + dip;
+            const high = y + h + neckHalfWidth - dip;
+            const middle = low + (high - low) * beadPhase;
             const top = style.bead ? middle - neckHalfWidth : y + h - neckHalfWidth;
             const bottom = style.bead ? middle + neckHalfWidth : dock.area.y + neckHalfWidth;
             if (bottom <= top)
@@ -263,6 +267,28 @@ PanelWindow {
 
         Behavior on progress {
             Anim {}
+        }
+
+        // the bead bounces between dock (0) and bubble (1) for as long as it shows
+        property real beadPhase: 0
+
+        SequentialAnimation on beadPhase {
+            running: dockHint.visible && dockHint.style.bead
+            loops: Animation.Infinite
+
+            NumberAnimation {
+                from: 0
+                to: 1
+                duration: Theme.beadTravel
+                easing.type: Easing.InOutSine
+            }
+
+            NumberAnimation {
+                from: 1
+                to: 0
+                duration: Theme.beadTravel
+                easing.type: Easing.InOutSine
+            }
         }
 
         // glide along with the pointer once showing

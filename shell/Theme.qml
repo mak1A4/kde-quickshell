@@ -51,8 +51,10 @@ Singleton {
     //   "neck"   - slender neck above the icon
     //   "bridge" - thick liquid bridge, bubble held further away
     //   "tab"    - no gap: the bubble sits on the dock like a raised tab
-    //   "bead"   - not joined: a small bead floats between dock and bubble
+    //   "bead"   - not joined: a small bead bounces between dock and bubble
     readonly property string dockHintStyle: "bead"
+    // time the bead takes to cross from dock to bubble, one way
+    readonly property int beadTravel: 600
     // hover time before a hint appears; switching between hints is immediate
     readonly property int hintDelay: 400
 }
