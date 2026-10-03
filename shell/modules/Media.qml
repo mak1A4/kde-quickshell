@@ -15,6 +15,8 @@ BarButton {
     readonly property MprisPlayer player: players.find(p => p.isPlaying) ?? players[0] ?? null
 
     visible: player !== null
+    hintTitle: player?.trackTitle || player?.identity || ""
+    hintLines: [player?.trackArtist, player?.trackAlbum, player?.trackTitle ? player?.identity : ""].filter(line => line)
     onClicked: button => {
         if (button === Qt.LeftButton && player.canTogglePlaying)
             player.togglePlaying();

@@ -59,6 +59,8 @@ RowLayout {
 
             required property var model
             required property int index
+            readonly property string hintTitle: model.display ?? ""
+            readonly property list<string> hintLines: model.AppName && model.AppName !== model.display ? [model.AppName] : []
 
             implicitWidth: 48
             implicitHeight: 48
@@ -89,6 +91,10 @@ RowLayout {
                 height: 3
                 radius: 1.5
                 color: Theme.accent
+            }
+
+            HoverHandler {
+                onHoveredChanged: Popouts.hover(task, hovered)
             }
 
             MouseArea {

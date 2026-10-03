@@ -44,6 +44,8 @@ ColumnLayout {
 
             implicitHeight: 27
             highlighted: current
+            hintTitle: info.desktopNames[index] ?? ""
+            hintLines: current ? ["Current desktop"] : []
             onClicked: root.activate(index)
             // wheel up = previous desktop
             onScrolled: steps => root.activate(info.desktopIds.indexOf(info.currentDesktop) - steps)

@@ -24,6 +24,11 @@ windows could not blend into the border.
   the frame and dismisses it. No compositor grab is involved.
 - **Dock:** hidden; the bottom border strip is the hover sensor (it is always in the
   input region), and the panel keeps itself open while hovered, with a 300 ms grace.
+- **Hints:** anything hoverable exposes `hintTitle` / `hintLines` and reports hover to
+  `Popouts.hover()`. The frame shows the hint as a small panel growing out of the bar, or
+  as a bubble above the dock for window icons. Hints are outside the input region and
+  give way to an open popout. They are also how a compact `Guarded` error icon says what
+  failed.
 - **Tray menus** are still real popups (`MenuPopup`), opening to the left of the bar.
 
 The frame's inner corners are only slightly rounded (`Theme.frameRounding: 6`, was 24):

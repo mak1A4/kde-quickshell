@@ -19,6 +19,8 @@ ColumnLayout {
             id: item
 
             required property SystemTrayItem modelData
+            readonly property string hintTitle: modelData.tooltipTitle || modelData.title || modelData.id
+            readonly property list<string> hintLines: modelData.tooltipDescription ? [modelData.tooltipDescription] : []
 
             implicitWidth: Theme.barButton
             implicitHeight: 30
@@ -29,6 +31,10 @@ ColumnLayout {
                 anchors.centerIn: parent
                 implicitSize: Theme.iconSize
                 source: item.modelData.icon
+            }
+
+            HoverHandler {
+                onHoveredChanged: Popouts.hover(item, hovered)
             }
 
             MouseArea {

@@ -6,6 +6,8 @@ import qs.widgets
 
 BarButton {
     interactive: false
+    hintTitle: Qt.formatDateTime(clock.date, "dddd")
+    hintLines: [Qt.locale().toString(clock.date, "d MMMM yyyy")]
 
     SystemClock {
         id: clock

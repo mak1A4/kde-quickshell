@@ -19,6 +19,8 @@ BarButton {
     readonly property bool muted: available && sink.audio.muted
 
     active: Popouts.current === "audio"
+    hintTitle: available ? (sink.description || sink.name) : "No audio output"
+    hintLines: available ? [muted ? "Muted" : `Volume ${Math.round(volume * 100)}%`] : []
     onClicked: button => {
         if (button === Qt.LeftButton)
             Popouts.toggle("audio", root, mixer);

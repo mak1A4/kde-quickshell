@@ -12,7 +12,10 @@ Rectangle {
     property bool interactive: true
     // stays lit while something it opened (a popout) is showing
     property bool active: false
-    readonly property bool hovered: mouse.containsMouse
+    readonly property bool hovered: hover.hovered
+    // shown beside the bar while hovered; no hint when the title is empty
+    property string hintTitle: ""
+    property list<string> hintLines: []
 
     signal clicked(int button)
     // +1 per wheel notch up, -1 per notch down
@@ -27,6 +30,13 @@ Rectangle {
         if (active || (interactive && hovered))
             return Theme.surfaceHover;
         return "transparent";
+    }
+
+    // separate from the MouseArea so non-interactive buttons report hover too
+    HoverHandler {
+        id: hover
+
+        onHoveredChanged: Popouts.hover(root, hovered)
     }
 
     ColumnLayout {

@@ -12,11 +12,20 @@ PanelWindow {
 
     readonly property bool popoutOpen: Popouts.current !== "" && owns(Popouts.anchorItem)
 
-    function owns(item) {
+    // hovered item with a hint, split by where it lives; hints yield to popouts
+    readonly property Item hintItem: !popoutOpen && (Popouts.hintItem?.hintTitle ?? "") !== "" ? Popouts.hintItem : null
+    readonly property Item barHint: within(hintItem, bar) ? hintItem : null
+    readonly property Item dockHint: within(hintItem, dock) ? hintItem : null
+
+    function within(item, ancestor) {
         for (let p = item; p; p = p.parent)
-            if (p === bar)
+            if (p === ancestor)
                 return true;
         return false;
+    }
+
+    function owns(item) {
+        return within(item, bar);
     }
 
     anchors {
@@ -151,6 +160,96 @@ PanelWindow {
             Behavior on opacity {
                 Anim {}
             }
+        }
+    }
+
+    // hint for a hovered bar button: a small panel growing out of the bar.
+    // Not in the input region; it is only looked at.
+    AttachedShape {
+        x: barHintPanel.x
+        y: barHintPanel.y
+        width: barHintPanel.width
+        height: barHintPanel.height
+        edge: Qt.RightEdge
+    }
+
+    Item {
+        id: barHintPanel
+
+        property real anchorY: 0
+        readonly property real minY: Theme.frameBorder + Theme.frameRounding + Theme.panelRounding
+        readonly property real maxY: root.height - Theme.frameBorder - Theme.frameRounding - Theme.panelRounding - height
+
+        x: root.width - Theme.barWidth - width
+        y: Math.max(minY, Math.min(maxY, anchorY - height / 2))
+        width: root.barHint ? barHintText.implicitWidth + Theme.padding * 2 + Theme.spacing : 0
+        height: barHintText.implicitHeight + Theme.padding * 2
+        clip: true
+
+        Behavior on width {
+            Anim {}
+        }
+
+        Behavior on y {
+            enabled: barHintPanel.width > 0
+
+            Anim {}
+        }
+
+        Connections {
+            target: root
+
+            function onBarHintChanged() {
+                if (root.barHint)
+                    barHintPanel.anchorY = root.barHint.mapToItem(null, 0, root.barHint.height / 2).y;
+            }
+        }
+
+        Hint {
+            id: barHintText
+
+            x: Theme.padding + Theme.spacing
+            y: Theme.padding
+            source: root.barHint
+        }
+    }
+
+    // hint for a hovered dock icon: a bubble above it
+    Rectangle {
+        id: dockHintBubble
+
+        property real anchorX: 0
+
+        x: Math.max(Theme.frameBorder + Theme.spacing, Math.min(root.width - Theme.barWidth - Theme.spacing - width, anchorX - width / 2))
+        y: dock.panel.y - height - Theme.spacing
+        width: dockHintText.implicitWidth + Theme.padding * 2
+        height: dockHintText.implicitHeight + Theme.spacing * 2
+        radius: Theme.radius * 2
+        color: Theme.bg
+        opacity: root.dockHint && dock.shown ? 1 : 0
+        visible: opacity > 0
+
+        Behavior on opacity {
+            NumberAnimation {
+                duration: 150
+            }
+        }
+
+        Connections {
+            target: root
+
+            function onDockHintChanged() {
+                if (root.dockHint)
+                    dockHintBubble.anchorX = root.dockHint.mapToItem(null, root.dockHint.width / 2, 0).x;
+            }
+        }
+
+        Hint {
+            id: dockHintText
+
+            x: Theme.padding
+            y: Theme.spacing
+            source: root.dockHint
         }
     }
 

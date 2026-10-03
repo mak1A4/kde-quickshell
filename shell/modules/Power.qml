@@ -16,6 +16,27 @@ BarButton {
     readonly property bool charging: batteryModel.state === Battery.BatteryControlModel.Charging
 
     active: Popouts.current === "power"
+    hintTitle: {
+        if (hasBattery)
+            return `Battery ${batteryModel.percent}%` + (charging ? ", charging" : "");
+        return profilesControl.activeProfile ? "Power profile" : "Power";
+    }
+    hintLines: {
+        const names = {
+            "power-saver": "Power Save",
+            "balanced": "Balanced",
+            "performance": "Performance"
+        };
+        const lines = [];
+        if (profilesControl.activeProfile)
+            lines.push(names[profilesControl.activeProfile] ?? profilesControl.activeProfile);
+        if (inhibitionControl.isManuallyInhibited)
+            lines.push("Sleep and screen locking blocked manually");
+        const apps = [...new Set(inhibitionControl.requestedInhibitions.filter(r => r.active && r.allowed).map(r => r.prettyName))];
+        if (apps.length > 0)
+            lines.push("Blocking sleep: " + apps.join(", "));
+        return lines;
+    }
     onClicked: button => {
         if (button === Qt.LeftButton)
             Popouts.toggle("power", root, panel);

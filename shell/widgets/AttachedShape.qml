@@ -12,7 +12,7 @@ Shape {
     property real rounding: Theme.panelRounding
 
     // shrinks while the panel is nearly closed, so the arcs never overlap
-    readonly property real r: Math.min(rounding, (edge === Qt.BottomEdge ? height : width) / 2)
+    readonly property real r: Math.min(rounding, width / 2, height / 2)
     readonly property real w: width
     readonly property real h: height
 

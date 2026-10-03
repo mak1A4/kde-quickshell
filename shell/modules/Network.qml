@@ -18,6 +18,27 @@ BarButton {
     readonly property bool limited: (wired || wifi) && [NetworkConnectivity.None, NetworkConnectivity.Portal, NetworkConnectivity.Limited].includes(Networking.connectivity)
 
     interactive: false
+    hintTitle: {
+        if (!available)
+            return "NetworkManager unavailable";
+        if (wired)
+            return "Wired";
+        if (wifi)
+            return wifiNetwork?.name ?? "Wi-Fi";
+        return "Offline";
+    }
+    hintLines: {
+        const lines = [];
+        if (wired)
+            lines.push(wired.name + (wired.linkSpeed ? ` · ${wired.linkSpeed} Mb/s` : ""));
+        if (wifi)
+            lines.push(`${wifi.name} · signal ${Math.round((wifiNetwork?.signalStrength ?? 0) * 100)}%`);
+        if (wired && wifi)
+            lines.push("Wi-Fi: " + (wifiNetwork?.name ?? "connected"));
+        if (available && (wired || wifi))
+            lines.push(limited ? "No internet access" : NetworkConnectivity.toString(Networking.connectivity));
+        return lines;
+    }
 
     Icon {
         Layout.alignment: Qt.AlignHCenter

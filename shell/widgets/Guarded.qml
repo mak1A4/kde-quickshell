@@ -13,6 +13,9 @@ Item {
     property alias active: loader.active
     readonly property bool failed: loader.status === Loader.Error
     readonly property Item error: compact ? errorIcon : errorLabel
+    // the compact error icon explains itself on hover
+    readonly property string hintTitle: failed && compact ? name + ": module not loadable" : ""
+    readonly property list<string> hintLines: ["See `qs log` for the import error"]
 
     implicitWidth: failed ? error.implicitWidth : loader.implicitWidth
     implicitHeight: failed ? error.implicitHeight : loader.implicitHeight
@@ -31,6 +34,11 @@ Item {
         color: Theme.error
         padding: Theme.padding
         text: root.name + ": module not loadable"
+    }
+
+    HoverHandler {
+        enabled: root.failed && root.compact
+        onHoveredChanged: Popouts.hover(root, hovered)
     }
 
     Icon {
