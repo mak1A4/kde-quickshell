@@ -206,8 +206,8 @@ PanelWindow {
             opacity: sidePanel.hinting ? 1 : 0
 
             Behavior on opacity {
-                Anim {
-                    kind: Anim.Fade
+                SwapFade {
+                    incoming: sidePanel.hinting
                 }
             }
         }
@@ -224,8 +224,8 @@ PanelWindow {
             opacity: root.popoutOpen ? 1 : 0
 
             Behavior on opacity {
-                Anim {
-                    kind: Anim.Fade
+                SwapFade {
+                    incoming: root.popoutOpen
                 }
             }
         }

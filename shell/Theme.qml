@@ -51,6 +51,9 @@ Singleton {
     readonly property list<real> moveCurve: [0.38, 1.21, 0.22, 1, 1, 1]
     readonly property int fadeDuration: 200
     readonly property list<real> fadeCurve: [0.34, 0.8, 0.34, 1, 1, 1]
+    // When one content replaces another in the same panel, the new one waits
+    // this long before fading in, so the two are not on screen together.
+    readonly property int swapDelay: 140
     // hover time before a hint appears; switching between hints is immediate
     readonly property int hintDelay: 400
 }

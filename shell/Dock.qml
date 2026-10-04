@@ -102,6 +102,10 @@ Item {
             y: root.slack + (root.h + Theme.panelSmoothing) * root.offset
             width: root.w
             height: root.h
+            // Exactly the background's size, and clipping: while the dock grows
+            // into the launcher, or the launcher resizes as you type, content
+            // laid out for the final size is uncovered, never drawn outside it.
+            clip: true
 
             HoverHandler {
                 id: panelHover
@@ -119,15 +123,18 @@ Item {
             RowLayout {
                 id: row
 
-                x: Theme.padding
-                y: (Theme.dockHeight - implicitHeight) / 2
+                // Centred, and on the dock's own strip at the bottom: while the
+                // panel is launcher-sized the row stays where the dock is,
+                // instead of riding the top edge as the panel grows or shrinks.
+                x: (panel.width - implicitWidth) / 2
+                y: panel.height - Theme.dockHeight + (Theme.dockHeight - implicitHeight) / 2
                 spacing: Theme.spacing
                 opacity: root.visibleNow && !root.launcherOpen ? 1 : 0
                 visible: opacity > 0
 
                 Behavior on opacity {
-                    Anim {
-                        kind: Anim.Fade
+                    SwapFade {
+                        incoming: !root.launcherOpen
                     }
                 }
 
@@ -189,8 +196,8 @@ Item {
                 sourceComponent: LauncherPanel {}
 
                 Behavior on opacity {
-                    Anim {
-                        kind: Anim.Fade
+                    SwapFade {
+                        incoming: root.launcherOpen
                     }
                 }
             }
