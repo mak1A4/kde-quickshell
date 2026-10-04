@@ -85,8 +85,23 @@ Item {
         list.currentIndex = Math.max(0, Math.min(list.count - 1, list.currentIndex + by));
     }
 
-    // Pointer selection: no scrolling, see the list below.
-    function select(index) {
+    // Where the pointer was last seen, in window coordinates (x < 0: not yet).
+    property point pointerAt: Qt.point(-1, -1)
+
+    // Pointer selection, called for every hover report of a row. It acts only
+    // when the pointer has really moved on screen. Rows sliding under a resting
+    // pointer are reported as movement too (the pointer's position within the
+    // row changes), and with the list gliding that happens every frame; acting
+    // on those re-selects the row under the pointer and fights the keyboard.
+    // Pointer selection never scrolls, see the list below.
+    function hover(index, at) {
+        const first = pointerAt.x < 0;
+        const moved = Math.abs(at.x - pointerAt.x) >= 1 || Math.abs(at.y - pointerAt.y) >= 1;
+        pointerAt = at;
+        // the first report only says where the pointer rests: the launcher
+        // usually opens right under it, and that must not select anything
+        if (first || !moved)
+            return;
         repeating = false;
         following = false;
         list.currentIndex = index;
@@ -189,8 +204,8 @@ Item {
                 hoverEnabled: true
                 // Real pointer movement selects the row under it, without
                 // scrolling. A still pointer selects nothing, so the wheel or
-                // the keyboard can move the list underneath it.
-                onPositionChanged: root.select(row.index)
+                // the keyboard can move the list underneath it (see hover()).
+                onPositionChanged: mouse => root.hover(row.index, mapToItem(null, mouse.x, mouse.y))
                 onClicked: Launcher.activate(row.modelData)
             }
         }
