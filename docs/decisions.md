@@ -71,6 +71,15 @@ timing carried over.
   which gives it the shared shadow. Joining it to the dock was tried in several forms and
   rejected (2026-10-04): a triangle tail, then shader variants `neck`, `bridge`, `tab`
   and a bouncing `bead`. Those are in git history if ever wanted again.
+- **One side panel:** the hint of a hovered bar button and the popout a button opens are
+  the same panel (`sidePanel` in `Frame.qml`) with different content. Clicking a button
+  grows its hint into the popout in place, and closing a popout with the pointer still on
+  the button shrinks it back to the hint, without the hint delay. As two panels (the
+  first version) one slid in while the other slid out through it. This is Caelestia's
+  structure: one popout wrapper per bar whose content and size change.
+  `SidePanel` animates width, height and anchor, and derives `y` from them, so the panel
+  stays centred on its button through a size change. Its content is clipped to the
+  background, so content laid out for the final size is uncovered as the panel grows.
 - **Hints** wait `Theme.hintDelay` (400 ms; Noctalia uses 500) before first appearing,
   then switch immediately between items.
 

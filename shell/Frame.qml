@@ -37,7 +37,9 @@ PanelWindow {
             return;
         }
         hintHide.stop();
-        if (shownHint)
+        // no delay if a hint is showing, or the side panel is still out from a
+        // popout that just closed: it then shrinks straight back to the hint
+        if (shownHint || !sidePanel.hidden)
             shownHint = wantedHint;
         else
             hintShow.restart();
@@ -129,8 +131,8 @@ PanelWindow {
             readonly property real smoothing: Theme.panelSmoothing
             readonly property color color: Theme.bg
             readonly property vector4d panel0: dock.blob
-            readonly property vector4d panel1: popout.blob
-            readonly property vector4d panel2: barHintPanel.blob
+            readonly property vector4d panel1: sidePanel.blob
+            readonly property vector4d panel2: Qt.vector4d(0, 0, 0, 0)
             readonly property vector4d bubble: dockHint.blob
             readonly property real bubbleRadius: 12
             readonly property color bubbleColor: Theme.tooltipBg
@@ -145,66 +147,37 @@ PanelWindow {
         screen: root.screen
     }
 
-    // popout of the bar module that asked for one, beside its button
+    // The one panel beside the bar. It shows the hint of the hovered button,
+    // or the popout a button opened, and morphs between the two in place:
+    // clicking a button grows its hint into the popout rather than swapping
+    // one panel for another. Only the popout takes input.
     SidePanel {
-        id: popout
+        id: sidePanel
 
-        function track() {
-            if (root.popoutOpen)
-                anchorY = Popouts.anchorItem.mapToItem(null, 0, Popouts.anchorItem.height / 2).y;
+        readonly property bool hinting: !root.popoutOpen && root.barHint !== null
+        // the button it currently belongs to
+        readonly property Item anchorItem: root.popoutOpen ? Popouts.anchorItem : root.barHint
+
+        onAnchorItemChanged: {
+            if (anchorItem)
+                anchorY = anchorItem.mapToItem(null, 0, anchorItem.height / 2).y;
         }
 
         edgeX: root.innerRight
         // keeps the fillets clear of the frame's corners
         minY: Theme.frameBorder + Theme.frameRounding + Theme.panelSmoothing
         maxY: root.height - Theme.frameBorder - Theme.frameRounding - Theme.panelSmoothing
-        open: root.popoutOpen
-        contentWidth: content.item?.implicitWidth ?? Theme.popupWidth
-        contentHeight: content.item?.implicitHeight ?? 0
+        open: root.popoutOpen || root.barHint !== null
+        contentWidth: root.popoutOpen ? (content.item?.implicitWidth ?? Theme.popupWidth) : barHintText.implicitWidth + Theme.padding * 2 + Theme.spacing
+        contentHeight: root.popoutOpen ? (content.item?.implicitHeight ?? 0) : barHintText.implicitHeight + Theme.padding * 2
         focus: root.popoutOpen
         Keys.onEscapePressed: Popouts.close()
 
-        Connections {
-            target: Popouts
-
-            function onCurrentChanged() {
-                popout.track();
-            }
-        }
-
-        // clicks inside must not reach the dismiss area underneath
+        // clicks inside a popout must not reach the dismiss area underneath
         MouseArea {
             anchors.fill: parent
+            enabled: root.popoutOpen
             acceptedButtons: Qt.AllButtons
-        }
-
-        Loader {
-            id: content
-
-            // stays loaded until it has slid back in
-            active: root.popoutOpen || !popout.hidden
-            sourceComponent: Popouts.content
-        }
-    }
-
-    // hint for a hovered bar button. Not in the input region; it is only looked at.
-    SidePanel {
-        id: barHintPanel
-
-        edgeX: root.innerRight
-        minY: popout.minY
-        maxY: popout.maxY
-        open: root.barHint !== null
-        contentWidth: barHintText.implicitWidth + Theme.padding * 2 + Theme.spacing
-        contentHeight: barHintText.implicitHeight + Theme.padding * 2
-
-        Connections {
-            target: root
-
-            function onBarHintChanged() {
-                if (root.barHint)
-                    barHintPanel.anchorY = root.barHint.mapToItem(null, 0, root.barHint.height / 2).y;
-            }
         }
 
         Hint {
@@ -213,6 +186,31 @@ PanelWindow {
             x: Theme.padding + Theme.spacing
             y: Theme.padding
             source: root.barHint
+            opacity: sidePanel.hinting ? 1 : 0
+
+            Behavior on opacity {
+                Anim {
+                    kind: Anim.Fade
+                }
+            }
+        }
+
+        // Held against the bar side: as the panel grows from hint to popout,
+        // the popout's content stays put and is uncovered.
+        Loader {
+            id: content
+
+            anchors.right: parent.right
+            // stays loaded until it has faded out
+            active: root.popoutOpen || opacity > 0
+            sourceComponent: Popouts.content
+            opacity: root.popoutOpen ? 1 : 0
+
+            Behavior on opacity {
+                Anim {
+                    kind: Anim.Fade
+                }
+            }
         }
     }
 

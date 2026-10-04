@@ -2,8 +2,11 @@ import QtQuick
 import qs
 
 // A panel that slides out from behind the bar's inner edge, at full size, and
-// back in. This item is only the clip (so nothing draws over the bar while
-// sliding); `blob` is the rectangle the frame shader draws as its background.
+// back in. While it is out, changing `contentWidth`, `contentHeight` or
+// `anchorY` morphs it in place: it grows or shrinks around its anchor and
+// glides to a new one. This item is only the clip (so nothing draws over the
+// bar while sliding); `blob` is the rectangle the frame shader draws as its
+// background.
 Item {
     id: root
 
@@ -22,9 +25,11 @@ Item {
     // 1 = fully behind the bar, 0 = out; overshoots below 0 on the way out
     property real offset: open ? 0 : 1
     readonly property bool hidden: offset >= 1
-    // animated size, so switching content resizes smoothly
-    property real w: contentWidth
-    property real h: contentHeight
+    // Animated size and anchor. They follow the content only while open, so a
+    // closing panel keeps its shape instead of collapsing as it slides away.
+    property real w: 0
+    property real h: 0
+    property real centre: 0
     // room on the free side for the overshoot
     readonly property real slack: 36
 
@@ -38,18 +43,27 @@ Item {
     }
 
     x: edgeX - w - slack
-    y: Math.max(minY, Math.min(maxY - h, anchorY - h / 2))
+    // y is derived, not animated itself: it then stays centred on the anchor
+    // through every frame of a size change
+    y: Math.max(minY, Math.min(maxY - h, centre - h / 2))
     width: w + slack
     height: h
-    clip: true
     visible: !hidden
+
+    Binding {
+        root.w: root.contentWidth
+        root.h: root.contentHeight
+        root.centre: root.anchorY
+        when: root.open
+        restoreMode: Binding.RestoreNone
+    }
 
     Behavior on offset {
         Anim {}
     }
 
-    // glide while showing, but appear in place when opening
-    Behavior on y {
+    // morph while showing, but appear in place when opening
+    Behavior on centre {
         enabled: !root.hidden
 
         Anim {}
@@ -67,18 +81,14 @@ Item {
         Anim {}
     }
 
+    // Exactly the background's size, and clipping: while the panel grows,
+    // content laid out for the final size is revealed, never drawn outside it.
     Item {
         id: slider
 
         x: root.slack + (root.w + Theme.panelSmoothing) * root.offset
         width: root.w
         height: root.h
-        opacity: root.open ? 1 : 0
-
-        Behavior on opacity {
-            Anim {
-                kind: Anim.Fade
-            }
-        }
+        clip: true
     }
 }
