@@ -83,6 +83,13 @@ timing carried over.
   `SidePanel` animates width, height and anchor, and derives `y` from them, so the panel
   stays centred on its button through a size change. Its content is clipped to the
   background, so content laid out for the final size is uncovered as the panel grows.
+- **Content inside a morphing panel:** two rules, learned from the launcher looking
+  "fixed" while the dock grew around it. Content is clipped to the background rectangle
+  (it is laid out at its final size at once, while the shape takes 500 ms to get there).
+  And content that takes turns with other content uses `widgets/SwapFade.qml`: it fades
+  out at once but waits `Theme.swapDelay` before fading in, so the two never overlap.
+  The dock's icon row also stays on the dock's own strip at the bottom while the panel
+  is launcher-sized.
 - **Hints** wait `Theme.hintDelay` (400 ms; Noctalia uses 500) before first appearing,
   then switch immediately between items.
 
