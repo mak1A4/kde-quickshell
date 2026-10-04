@@ -12,11 +12,13 @@ PanelWindow {
 
     readonly property real innerRight: width - Theme.barWidth
     readonly property bool popoutOpen: Popouts.current !== "" && within(Popouts.anchorItem, bar)
+    // a popout or the launcher: something that a click elsewhere dismisses
+    readonly property bool modal: popoutOpen || dock.launcherOpen
 
     // Hovered item with a hint. A hint waits Theme.hintDelay before it first
     // appears; once one is showing, moving to another item switches at once.
     // Hints yield to an open popout.
-    readonly property Item wantedHint: !popoutOpen && (Popouts.hintItem?.hintTitle ?? "") !== "" ? Popouts.hintItem : null
+    readonly property Item wantedHint: !modal && (Popouts.hintItem?.hintTitle ?? "") !== "" ? Popouts.hintItem : null
     property Item shownHint: null
     readonly property Item barHint: within(shownHint, bar) ? shownHint : null
     readonly property Item dockHintItem: within(shownHint, dock) ? shownHint : null
@@ -69,15 +71,17 @@ PanelWindow {
     // a panel: it stays when all windows are hidden (show desktop), and window
     // effects leave it alone. Any other name is a normal window to KWin.
     WlrLayershell.namespace: "dock"
-    WlrLayershell.keyboardFocus: popoutOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    // the launcher is typed into, so it takes the keyboard outright; a
+    // popout only gets it once clicked
+    WlrLayershell.keyboardFocus: dock.launcherOpen ? WlrKeyboardFocus.Exclusive : (popoutOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
 
     mask: Region {
-        // The click-through hole. It closes while a popout is open, so a
-        // click anywhere outside the popout reaches us and dismisses it.
+        // The click-through hole. It closes while a popout or the launcher
+        // is open, so a click anywhere outside reaches us and dismisses it.
         x: Theme.frameBorder
         y: Theme.frameBorder
-        width: root.popoutOpen ? 0 : root.innerRight - Theme.frameBorder
-        height: root.popoutOpen ? 0 : root.height - Theme.frameBorder * 2
+        width: root.modal ? 0 : root.innerRight - Theme.frameBorder
+        height: root.modal ? 0 : root.height - Theme.frameBorder * 2
         intersection: Intersection.Xor
 
         Region {
@@ -91,9 +95,12 @@ PanelWindow {
 
     MouseArea {
         anchors.fill: parent
-        enabled: root.popoutOpen
+        enabled: root.modal
         acceptedButtons: Qt.AllButtons
-        onPressed: Popouts.close()
+        onPressed: {
+            Popouts.close();
+            Launcher.hide();
+        }
     }
 
     // Border and panel backgrounds, as one merged shape (see the shader),
@@ -135,6 +142,7 @@ PanelWindow {
         id: dock
 
         anchors.fill: parent
+        screen: root.screen
     }
 
     // popout of the bar module that asked for one, beside its button

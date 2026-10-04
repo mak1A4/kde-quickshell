@@ -28,6 +28,7 @@ Singleton {
             close();
             return;
         }
+        Launcher.hide();
         root.anchorItem = anchorItem;
         root.content = content;
         current = name;
