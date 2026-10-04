@@ -24,6 +24,7 @@ Singleton {
     function show(onScreen) {
         screen = onScreen ?? Quickshell.screens[0] ?? null;
         Popouts.close();
+        CommandPalette.hide();
         query = "";
         open = true;
     }
@@ -41,6 +42,17 @@ Singleton {
 
     IpcHandler {
         target: "launcher"
+
+        // state for scripts and tests: `qs ipc call launcher isOpen`. (Functions, not
+        // properties: those make Quickshell warn about their change signals
+        // on every load.)
+        function isOpen(): bool {
+            return root.open;
+        }
+
+        function query(): string {
+            return root.query;
+        }
 
         function toggle(): void {
             root.toggle(null);
@@ -147,15 +159,22 @@ Singleton {
 
     // ---- actions (">") ---------------------------------------------------
 
-    // The session actions, plus reloading the shell. From here, anything that
-    // ends the session goes through KDE's own confirmation screen: one Enter
-    // on a typed query should not be enough to shut the machine down.
+    // The session actions, plus the shell's settings and reloading it. From
+    // here, anything that ends the session goes through KDE's own
+    // confirmation screen: one Enter on a typed query should not be enough to
+    // shut the machine down.
     readonly property var actions: SessionActions.available.map(action => ({
                 title: action.title,
                 subtitle: action.confirm ? "Asks for confirmation" : "",
                 icon: action.icon,
                 session: action
             })).concat([
+        {
+            title: "Shell settings",
+            subtitle: "Shortcuts for the palette and the launcher",
+            icon: "configure-symbolic",
+            settings: true
+        },
         {
             title: "Reload shell",
             subtitle: "Reload this shell's configuration",
@@ -252,10 +271,24 @@ Singleton {
             hide();
         } else if (result.kind === "action") {
             hide();
-            if (result.action.reload)
-                Quickshell.reload(false);
-            else
-                SessionActions.runWithPrompt(result.action.session);
+            runAction(result.action);
         }
+    }
+
+    // One of `actions`; also used by the command palette.
+    function runAction(action) {
+        if (action.reload)
+            Quickshell.reload(false);
+        else if (action.settings)
+            openSettings();
+        else
+            SessionActions.runWithPrompt(action.session);
+    }
+
+    // The settings are a program of their own, an ordinary KDE window: the
+    // config in ../settings. `-n`: a second start while the window is open
+    // does nothing.
+    function openSettings() {
+        Quickshell.execDetached(["qs", "-n", "-p", Quickshell.shellDir.replace(/[^\/]+\/?$/, "settings")]);
     }
 }

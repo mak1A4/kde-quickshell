@@ -34,6 +34,7 @@ Singleton {
             return;
         }
         Launcher.hide();
+        CommandPalette.hide();
         root.anchorItem = anchorItem;
         root.content = content;
         current = name;

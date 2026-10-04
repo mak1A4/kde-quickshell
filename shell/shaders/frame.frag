@@ -23,6 +23,7 @@ layout(std140, binding = 0) uniform buf {
     vec4 panel0;
     vec4 panel1;
     vec4 panel2;
+    vec4 panel3;
     // A tooltip bubble: a separate shape in its own colour, not merged with
     // the rest, but drawn here so it shares the shadow.
     vec4 bubble;
@@ -57,6 +58,7 @@ void main() {
     d = merge(d, p, panel0, panelRadius, smoothing);
     d = merge(d, p, panel1, panelRadius, smoothing);
     d = merge(d, p, panel2, panelRadius, smoothing);
+    d = merge(d, p, panel3, panelRadius, smoothing);
 
     float fw = fwidth(d);
     vec4 result = vec4(color.rgb, 1.0) * color.a * (1.0 - smoothstep(-fw, fw, d));

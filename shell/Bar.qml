@@ -32,6 +32,7 @@ Item {
         }
         spacing: 3
 
+        Bell {}
         Media {}
         Tray {
             Layout.alignment: Qt.AlignHCenter

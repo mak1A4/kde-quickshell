@@ -2,6 +2,8 @@ import Quickshell
 import Quickshell.Wayland
 import QtQuick
 import QtQuick.Effects
+import qs.notifications
+import qs.palette
 import qs.widgets
 
 // One transparent surface over the whole screen. It draws the border, the bar
@@ -12,8 +14,8 @@ PanelWindow {
 
     readonly property real innerRight: width - Theme.barWidth
     readonly property bool popoutOpen: Popouts.current !== "" && within(Popouts.anchorItem, bar)
-    // a popout or the launcher: something that a click elsewhere dismisses
-    readonly property bool modal: popoutOpen || dock.launcherOpen
+    // a popout, the launcher or the palette: something that a click elsewhere dismisses
+    readonly property bool modal: popoutOpen || dock.launcherOpen || commandPalette.showing
 
     // Hovered item with a hint. A hint waits Theme.hintDelay before it first
     // appears; once one is showing, moving to another item switches at once.
@@ -90,13 +92,14 @@ PanelWindow {
     // a panel: it stays when all windows are hidden (show desktop), and window
     // effects leave it alone. Any other name is a normal window to KWin.
     WlrLayershell.namespace: "dock"
-    // the launcher is typed into, so it takes the keyboard outright; a
-    // popout only gets it once clicked
-    WlrLayershell.keyboardFocus: dock.launcherOpen ? WlrKeyboardFocus.Exclusive : (popoutOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
+    // the launcher and the palette are typed into, so they take the keyboard
+    // outright; a popout only gets it once clicked
+    WlrLayershell.keyboardFocus: dock.launcherOpen || commandPalette.showing ? WlrKeyboardFocus.Exclusive : (popoutOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
 
     mask: Region {
-        // The click-through hole. It closes while a popout or the launcher
-        // is open, so a click anywhere outside reaches us and dismisses it.
+        // The click-through hole. It closes while a popout, the launcher or
+        // the palette is open, so a click anywhere outside reaches us and
+        // dismisses it.
         x: Theme.frameBorder
         y: Theme.frameBorder
         width: root.modal ? 0 : root.innerRight - Theme.frameBorder
@@ -110,6 +113,15 @@ PanelWindow {
             height: dock.area.height
             intersection: Intersection.Subtract
         }
+
+        // notification popups take the pointer too
+        Region {
+            x: notificationPanel.area.x
+            y: notificationPanel.area.y
+            width: notificationPanel.area.width
+            height: notificationPanel.area.height
+            intersection: Intersection.Subtract
+        }
     }
 
     MouseArea {
@@ -119,6 +131,7 @@ PanelWindow {
         onPressed: {
             Popouts.close();
             Launcher.hide();
+            CommandPalette.hide();
         }
     }
 
@@ -149,7 +162,8 @@ PanelWindow {
             readonly property color color: Theme.bg
             readonly property vector4d panel0: dock.blob
             readonly property vector4d panel1: sidePanel.blob
-            readonly property vector4d panel2: Qt.vector4d(0, 0, 0, 0)
+            readonly property vector4d panel2: commandPalette.blob
+            readonly property vector4d panel3: notificationPanel.blob
             readonly property vector4d bubble: dockHint.blob
             readonly property real bubbleRadius: 12
             readonly property color bubbleColor: Theme.tooltipBg
@@ -162,6 +176,79 @@ PanelWindow {
 
         anchors.fill: parent
         screen: root.screen
+    }
+
+    // The command palette, hanging from the top edge. Its content exists
+    // only while open (and until it has faded out).
+    TopPanel {
+        id: commandPalette
+
+        readonly property bool showing: CommandPalette.open && (CommandPalette.screen === null || CommandPalette.screen === root.screen)
+
+        anchors.fill: parent
+        edgeY: Theme.frameBorder
+        centreX: (Theme.frameBorder + root.innerRight) / 2
+        open: showing
+        // fallbacks for the instant before the loader has the content
+        contentWidth: paletteLoader.item?.implicitWidth ?? 660
+        contentHeight: paletteLoader.item?.implicitHeight ?? 69
+
+        // clicks on the palette must not reach the dismiss area underneath
+        MouseArea {
+            anchors.fill: parent
+            enabled: commandPalette.showing
+            acceptedButtons: Qt.AllButtons
+        }
+
+        Loader {
+            id: paletteLoader
+
+            active: commandPalette.showing || opacity > 0
+            opacity: commandPalette.showing ? 1 : 0
+            sourceComponent: PalettePanel {}
+
+            Behavior on opacity {
+                Anim {
+                    kind: Anim.Fade
+                }
+            }
+        }
+    }
+
+    // Notification popups, hanging from the top edge against the bar, on the
+    // first screen. They step aside while the palette is open: the two would
+    // touch, and what is being typed comes first.
+    TopPanel {
+        id: notificationPanel
+
+        readonly property bool here: root.screen === Quickshell.screens[0]
+        readonly property bool showing: (popups.item?.count ?? 0) > 0 && !commandPalette.showing
+
+        anchors.fill: parent
+        edgeY: Theme.frameBorder
+        // its background runs on under the bar, so the two join
+        centreX: root.innerRight + Theme.panelRounding - contentWidth / 2
+        open: showing
+        contentWidth: (popups.item?.implicitWidth ?? 0) + Theme.panelRounding
+        contentHeight: popups.item?.implicitHeight ?? 0
+
+        // clicks between the cards go nowhere
+        MouseArea {
+            anchors.fill: parent
+            enabled: notificationPanel.showing
+            acceptedButtons: Qt.AllButtons
+        }
+
+        Loader {
+            id: popups
+
+            active: notificationPanel.here && Notifications.popups !== null
+            sourceComponent: Popups {
+                notifications: Notifications.popups
+                timeout: Notifications.backend.popupTimeout
+                paused: !notificationPanel.showing
+            }
+        }
     }
 
     // The one panel beside the bar. It shows the hint of the hovered button,

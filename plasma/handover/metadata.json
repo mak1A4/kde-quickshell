@@ -1,0 +1,16 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Category": "System Information",
+        "Description": "Lets the Quickshell shell show notifications while it runs, and Plasma whenever it does not",
+        "EnabledByDefault": true,
+        "Icon": "preferences-desktop-notification",
+        "Id": "io.github.mak1a4.kde-quickshell.handover",
+        "License": "GPL",
+        "Name": "Quickshell notification handover",
+        "Version": "1"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-NotificationArea": "true",
+    "X-Plasma-NotificationAreaCategory": "SystemServices"
+}

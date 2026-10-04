@@ -2,6 +2,8 @@ import Quickshell
 import QtQuick
 
 ShellRoot {
+    Hotkeys {}
+
     Variants {
         model: Quickshell.screens
 

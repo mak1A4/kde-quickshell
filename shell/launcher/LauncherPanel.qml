@@ -20,107 +20,15 @@ Item {
     implicitWidth: 540
     implicitHeight: list.height + (list.height > 0 ? margin : 0) + empty.height + search.height + margin * 2
 
-    // ---- selection movement ------------------------------------------------
-    //
-    // One thing is animated: `highlightY`, the highlight's position in the
-    // list. For keyboard moves the scroll position is not animated separately
-    // but follows the highlight frame by frame (`follow`), so the two cannot
-    // drift apart. (Animating both, the highlight fell behind on a held key and
-    // was dragged upward by the scrolling list.)
-    //
-    // A single press eases with the shell's curve. A held key glides at
-    // constant speed, one row per step, each step lasting as long as the gap
-    // between steps, which reads as continuous motion instead of hops.
-
-    // true while a key is held down and repeating
-    property bool repeating: false
-    // A held key steps at most this often (ms), whatever the keyboard's own
-    // repeat rate: at the system rate the list ran past too fast to follow.
-    readonly property int repeatInterval: 66
-    property real lastRepeat: 0
-    // measured time between the steps of a held key
-    property int stepDuration: 80
-    // the scroll position follows the highlight (keyboard), or not (pointer)
-    property bool following: false
-    // set to move the highlight without animation
-    property bool jump: false
-
-    property real highlightY: list.currentIndex * rowHeight
-
-    Behavior on highlightY {
-        enabled: !root.jump
-
-        NumberAnimation {
-            duration: root.repeating ? root.stepDuration : Theme.fadeDuration
-            easing.type: root.repeating ? Easing.Linear : Easing.BezierSpline
-            easing.bezierCurve: Theme.fadeCurve
-        }
-    }
-
-    onHighlightYChanged: {
-        if (!following)
-            return;
-        if (highlightY < list.contentY)
-            list.contentY = highlightY;
-        else if (highlightY + rowHeight > list.contentY + list.height)
-            list.contentY = highlightY + rowHeight - list.height;
-    }
-
-    // Keyboard selection: moves the selection; the list scrolls to keep it in view.
-    function move(by, autoRepeat) {
-        if (list.count === 0)
-            return;
-        repeating = autoRepeat ?? false;
-        if (repeating) {
-            const now = Date.now();
-            const since = now - lastRepeat;
-            if (since < repeatInterval)
-                return;
-            lastRepeat = now;
-            // the first repeat comes after the long initial delay; ignore that gap
-            if (since < 250)
-                stepDuration = since;
-        }
-        following = true;
-        list.currentIndex = Math.max(0, Math.min(list.count - 1, list.currentIndex + by));
-    }
-
-    // Where the pointer was last seen, in window coordinates (x < 0: not yet).
-    property point pointerAt: Qt.point(-1, -1)
-
-    // Pointer selection, called for every hover report of a row. It acts only
-    // when the pointer has really moved on screen. Rows sliding under a resting
-    // pointer are reported as movement too (the pointer's position within the
-    // row changes), and with the list gliding that happens every frame; acting
-    // on those re-selects the row under the pointer and fights the keyboard.
-    // Pointer selection never scrolls, see the list below.
-    function hover(index, at) {
-        const first = pointerAt.x < 0;
-        const moved = Math.abs(at.x - pointerAt.x) >= 1 || Math.abs(at.y - pointerAt.y) >= 1;
-        pointerAt = at;
-        // the first report only says where the pointer rests: the launcher
-        // usually opens right under it, and that must not select anything
-        if (first || !moved)
-            return;
-        repeating = false;
-        following = false;
-        list.currentIndex = index;
-    }
-
     function focusSearch() {
         input.forceActiveFocus();
     }
 
-    // new results: back to the first one, at the top, without gliding there
-    onResultsChanged: {
-        jump = true;
-        list.currentIndex = 0;
-        list.contentY = 0;
-        jump = false;
-    }
+    // new results: back to the first one
+    onResultsChanged: list.rewind()
     Component.onCompleted: focusSearch()
 
-    ListView {
+    PickList {
         id: list
 
         anchors {
@@ -129,29 +37,10 @@ Item {
             right: parent.right
             margins: root.margin
         }
-        height: Math.min(count, root.maxRows) * root.rowHeight
-        clip: true
+        rowHeight: root.rowHeight
+        maxRows: root.maxRows
         model: root.results
-        boundsBehavior: Flickable.StopAtBounds
-        // Only the wheel and the keyboard scroll. The list must not follow the
-        // selection by itself (hovering a half-visible row would scroll it,
-        // putting another row under the pointer, and so on), and dragging with
-        // the mouse must not flick it.
-        highlightRangeMode: ListView.NoHighlightRange
-        acceptedButtons: Qt.NoButton
-        // the wheel settles on whole rows
-        snapMode: ListView.SnapToItem
-        // the highlight is our own rectangle, so it can use the shell's curve
-        highlightFollowsCurrentItem: false
-
-        highlight: Rectangle {
-            y: root.highlightY
-            width: list.width
-            height: root.rowHeight
-            radius: 12
-            color: Theme.surface
-            visible: list.currentItem !== null && (list.currentItem.modelData.kind !== "none")
-        }
+        highlighted: currentItem?.modelData.kind !== "none"
 
         delegate: Item {
             id: row
@@ -204,8 +93,8 @@ Item {
                 hoverEnabled: true
                 // Real pointer movement selects the row under it, without
                 // scrolling. A still pointer selects nothing, so the wheel or
-                // the keyboard can move the list underneath it (see hover()).
-                onPositionChanged: mouse => root.hover(row.index, mapToItem(null, mouse.x, mouse.y))
+                // the keyboard can move the list underneath it.
+                onPositionChanged: mouse => list.hover(row.index, mapToItem(null, mouse.x, mouse.y))
                 onClicked: Launcher.activate(row.modelData)
             }
         }
@@ -287,19 +176,19 @@ Item {
             onTextChanged: Launcher.query = text
             onAccepted: Launcher.activate(root.results[list.currentIndex])
 
-            Keys.onUpPressed: event => root.move(-1, event.isAutoRepeat)
-            Keys.onDownPressed: event => root.move(1, event.isAutoRepeat)
+            Keys.onUpPressed: event => list.step(-1, event.isAutoRepeat)
+            Keys.onDownPressed: event => list.step(1, event.isAutoRepeat)
             Keys.onEscapePressed: Launcher.hide()
             Keys.onPressed: event => {
                 const control = event.modifiers & Qt.ControlModifier;
                 if (event.key === Qt.Key_Tab || (control && (event.key === Qt.Key_N || event.key === Qt.Key_J)))
-                    root.move(1, event.isAutoRepeat);
+                    list.step(1, event.isAutoRepeat);
                 else if (event.key === Qt.Key_Backtab || (control && (event.key === Qt.Key_P || event.key === Qt.Key_K)))
-                    root.move(-1, event.isAutoRepeat);
+                    list.step(-1, event.isAutoRepeat);
                 else if (event.key === Qt.Key_PageDown)
-                    root.move(root.maxRows, event.isAutoRepeat);
+                    list.step(root.maxRows, event.isAutoRepeat);
                 else if (event.key === Qt.Key_PageUp)
-                    root.move(-root.maxRows, event.isAutoRepeat);
+                    list.step(-root.maxRows, event.isAutoRepeat);
                 else
                     return;
                 event.accepted = true;
