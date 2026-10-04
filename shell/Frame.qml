@@ -52,12 +52,29 @@ PanelWindow {
         onTriggered: root.shownHint = root.wantedHint
     }
 
-    // short grace, so crossing the gap between two buttons doesn't close it
+    // Short grace before a hint goes away, so crossing the gap between two
+    // buttons doesn't close it. It then settles on whatever is hovered by then.
     Timer {
         id: hintHide
 
-        interval: 120
-        onTriggered: root.shownHint = null
+        interval: 150
+        onTriggered: root.shownHint = root.wantedHint
+    }
+
+    // A popout closed by its own button turns back into that button's hint,
+    // decided here and not by hover state: in the middle of a click the hover
+    // state can read "not hovered" for a moment, and the panel would slide
+    // away and come back. The grace timer then checks what is really hovered.
+    Connections {
+        target: Popouts
+
+        function onClosing(anchorItem, byOwner) {
+            if (!byOwner || !root.within(anchorItem, bar) || (anchorItem.hintTitle ?? "") === "")
+                return;
+            hintShow.stop();
+            root.shownHint = anchorItem;
+            hintHide.restart();
+        }
     }
 
     anchors {

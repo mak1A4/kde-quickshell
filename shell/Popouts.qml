@@ -23,9 +23,14 @@ Singleton {
             hintItem = null;
     }
 
+    // Emitted just before a popout closes. `byOwner` is true when the button
+    // that opened it closed it, i.e. the pointer is on that button.
+    signal closing(Item anchorItem, bool byOwner)
+
     function toggle(name: string, anchorItem: Item, content: Component) {
         if (current === name) {
-            close();
+            closing(root.anchorItem, true);
+            current = "";
             return;
         }
         Launcher.hide();
@@ -35,6 +40,8 @@ Singleton {
     }
 
     function close() {
+        if (current !== "")
+            closing(root.anchorItem, false);
         current = "";
     }
 }
