@@ -26,12 +26,22 @@ Item {
     // selection and is dragged upward by the scrolling list before it catches
     // up. A single press still glides.
     property bool repeating: false
+    // A held key steps at most this often (ms), whatever the keyboard's own
+    // repeat rate: at the system rate the list ran past too fast to follow.
+    readonly property int repeatInterval: 66
+    property real lastRepeat: 0
 
     // Keyboard selection: moves the selection and scrolls it into view.
     function move(by, autoRepeat) {
         if (list.count === 0)
             return;
         repeating = autoRepeat ?? false;
+        if (repeating) {
+            const now = Date.now();
+            if (now - lastRepeat < repeatInterval)
+                return;
+            lastRepeat = now;
+        }
         list.currentIndex = Math.max(0, Math.min(list.count - 1, list.currentIndex + by));
         const top = list.currentIndex * rowHeight;
         let target;
