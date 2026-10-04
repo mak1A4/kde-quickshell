@@ -20,51 +20,89 @@ Item {
     implicitWidth: 540
     implicitHeight: list.height + (list.height > 0 ? margin : 0) + empty.height + search.height + margin * 2
 
-    // True while a key is held down and repeating. Then nothing is animated:
-    // the highlight and the scroll position are eased separately, and with a
-    // new step every few milliseconds the highlight falls behind the
-    // selection and is dragged upward by the scrolling list before it catches
-    // up. A single press still glides.
+    // ---- selection movement ------------------------------------------------
+    //
+    // One thing is animated: `highlightY`, the highlight's position in the
+    // list. For keyboard moves the scroll position is not animated separately
+    // but follows the highlight frame by frame (`follow`), so the two cannot
+    // drift apart. (Animating both, the highlight fell behind on a held key and
+    // was dragged upward by the scrolling list.)
+    //
+    // A single press eases with the shell's curve. A held key glides at
+    // constant speed, one row per step, each step lasting as long as the gap
+    // between steps, which reads as continuous motion instead of hops.
+
+    // true while a key is held down and repeating
     property bool repeating: false
     // A held key steps at most this often (ms), whatever the keyboard's own
     // repeat rate: at the system rate the list ran past too fast to follow.
     readonly property int repeatInterval: 66
     property real lastRepeat: 0
+    // measured time between the steps of a held key
+    property int stepDuration: 80
+    // the scroll position follows the highlight (keyboard), or not (pointer)
+    property bool following: false
+    // set to move the highlight without animation
+    property bool jump: false
 
-    // Keyboard selection: moves the selection and scrolls it into view.
+    property real highlightY: list.currentIndex * rowHeight
+
+    Behavior on highlightY {
+        enabled: !root.jump
+
+        NumberAnimation {
+            duration: root.repeating ? root.stepDuration : Theme.fadeDuration
+            easing.type: root.repeating ? Easing.Linear : Easing.BezierSpline
+            easing.bezierCurve: Theme.fadeCurve
+        }
+    }
+
+    onHighlightYChanged: {
+        if (!following)
+            return;
+        if (highlightY < list.contentY)
+            list.contentY = highlightY;
+        else if (highlightY + rowHeight > list.contentY + list.height)
+            list.contentY = highlightY + rowHeight - list.height;
+    }
+
+    // Keyboard selection: moves the selection; the list scrolls to keep it in view.
     function move(by, autoRepeat) {
         if (list.count === 0)
             return;
         repeating = autoRepeat ?? false;
         if (repeating) {
             const now = Date.now();
-            if (now - lastRepeat < repeatInterval)
+            const since = now - lastRepeat;
+            if (since < repeatInterval)
                 return;
             lastRepeat = now;
+            // the first repeat comes after the long initial delay; ignore that gap
+            if (since < 250)
+                stepDuration = since;
         }
+        following = true;
         list.currentIndex = Math.max(0, Math.min(list.count - 1, list.currentIndex + by));
-        const top = list.currentIndex * rowHeight;
-        let target;
-        if (top < list.contentY)
-            target = top;
-        else if (top + rowHeight > list.contentY + list.height)
-            target = top + rowHeight - list.height;
-        else
-            return;
-        if (repeating) {
-            scroll.stop();
-            list.contentY = target;
-        } else {
-            scroll.to = target;
-            scroll.restart();
-        }
+    }
+
+    // Pointer selection: no scrolling, see the list below.
+    function select(index) {
+        repeating = false;
+        following = false;
+        list.currentIndex = index;
     }
 
     function focusSearch() {
         input.forceActiveFocus();
     }
 
-    onResultsChanged: list.currentIndex = 0
+    // new results: back to the first one, at the top, without gliding there
+    onResultsChanged: {
+        jump = true;
+        list.currentIndex = 0;
+        list.contentY = 0;
+        jump = false;
+    }
     Component.onCompleted: focusSearch()
 
     ListView {
@@ -91,33 +129,13 @@ Item {
         // the highlight is our own rectangle, so it can use the shell's curve
         highlightFollowsCurrentItem: false
 
-        // the same curve and duration as the highlight's, so that on a single
-        // press at the edge the two move as one and the highlight stays put
-        Anim {
-            id: scroll
-
-            kind: Anim.Fade
-            target: list
-            property: "contentY"
-        }
-
         highlight: Rectangle {
-            // from the index, not from currentItem: that is briefly null for a
-            // row not created yet, which would send the highlight to the top
-            y: list.currentIndex * root.rowHeight
+            y: root.highlightY
             width: list.width
             height: root.rowHeight
             radius: 12
             color: Theme.surface
             visible: list.currentItem !== null && (list.currentItem.modelData.kind !== "none")
-
-            Behavior on y {
-                enabled: !root.repeating
-
-                Anim {
-                    kind: Anim.Fade
-                }
-            }
         }
 
         delegate: Item {
@@ -172,10 +190,7 @@ Item {
                 // Real pointer movement selects the row under it, without
                 // scrolling. A still pointer selects nothing, so the wheel or
                 // the keyboard can move the list underneath it.
-                onPositionChanged: {
-                    root.repeating = false;
-                    list.currentIndex = row.index;
-                }
+                onPositionChanged: root.select(row.index)
                 onClicked: Launcher.activate(row.modelData)
             }
         }
