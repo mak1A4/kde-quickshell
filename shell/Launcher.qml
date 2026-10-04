@@ -145,47 +145,24 @@ Singleton {
         hide();
     }
 
-    // ---- session actions (">") -------------------------------------------
+    // ---- actions (">") ---------------------------------------------------
 
-    // Log out, restart and shut down go through KDE's own confirmation screen.
-    readonly property var actions: [
-        {
-            title: "Lock screen",
-            subtitle: "Lock this session",
-            icon: "system-lock-screen-symbolic",
-            command: ["loginctl", "lock-session"]
-        },
-        {
-            title: "Sleep",
-            subtitle: "Suspend to RAM",
-            icon: "system-suspend-symbolic",
-            command: ["systemctl", "suspend"]
-        },
-        {
-            title: "Log out",
-            subtitle: "Asks for confirmation",
-            icon: "system-log-out-symbolic",
-            command: ["busctl", "--user", "call", "org.kde.LogoutPrompt", "/LogoutPrompt", "org.kde.LogoutPrompt", "promptLogout"]
-        },
-        {
-            title: "Restart",
-            subtitle: "Asks for confirmation",
-            icon: "system-reboot-symbolic",
-            command: ["busctl", "--user", "call", "org.kde.LogoutPrompt", "/LogoutPrompt", "org.kde.LogoutPrompt", "promptReboot"]
-        },
-        {
-            title: "Shut down",
-            subtitle: "Asks for confirmation",
-            icon: "system-shutdown-symbolic",
-            command: ["busctl", "--user", "call", "org.kde.LogoutPrompt", "/LogoutPrompt", "org.kde.LogoutPrompt", "promptShutDown"]
-        },
+    // The session actions, plus reloading the shell. From here, anything that
+    // ends the session goes through KDE's own confirmation screen: one Enter
+    // on a typed query should not be enough to shut the machine down.
+    readonly property var actions: SessionActions.available.map(action => ({
+                title: action.title,
+                subtitle: action.confirm ? "Asks for confirmation" : "",
+                icon: action.icon,
+                session: action
+            })).concat([
         {
             title: "Reload shell",
             subtitle: "Reload this shell's configuration",
             icon: "view-refresh-symbolic",
             reload: true
         }
-    ]
+    ])
 
     // ---- results ---------------------------------------------------------
 
@@ -278,7 +255,7 @@ Singleton {
             if (result.action.reload)
                 Quickshell.reload(false);
             else
-                Quickshell.execDetached(result.action.command);
+                SessionActions.runWithPrompt(result.action.session);
         }
     }
 }

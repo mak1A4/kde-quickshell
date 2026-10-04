@@ -74,6 +74,25 @@ timing carried over.
 - **Hints** wait `Theme.hintDelay` (400 ms; Noctalia uses 500) before first appearing,
   then switch immediately between items.
 
+## Session menu
+
+A power button at the bottom of the bar opens a popout with lock, sleep, hibernate, log
+out, restart and shut down. One list, `SessionActions`, serves this menu and the
+launcher's `>` actions.
+
+- Lock and the sleep states go to logind (`loginctl lock-session`, `systemctl suspend`).
+  Hibernate is listed only if logind's `CanHibernate` says yes (here: no).
+- Log out, restart and shut down go to KDE's session manager (`org.kde.Shutdown`), which
+  closes applications in order; `systemctl poweroff` would not.
+- Confirmation: the bar menu arms an action on the first click and runs it on the second
+  (within 4 s), because KDE's own confirmation screen after our popout would be a second,
+  differently styled dialog. The launcher keeps KDE's screen (`org.kde.LogoutPrompt`): one
+  Enter on a typed query should not be able to shut the machine down.
+- None of the actions were run in testing, only the calls checked against the D-Bus
+  introspection.
+
+Popouts may now be narrower than `Theme.popupWidth`; the frame takes the content's width.
+
 ## App launcher
 
 Opened from the first button in the dock, or with `qs ipc -p <config> call launcher
@@ -93,8 +112,8 @@ tracking.
 - **Calculator:** `=` prefix, or plain arithmetic. `launcher/calc.js` is a hand-written
   parser, not `eval`. Enter copies the result with `wl-copy`; `Quickshell.clipboardText`
   did not reach the clipboard when tested.
-- **Actions (`>`):** lock, sleep, and log out / restart / shut down through KDE's
-  `org.kde.LogoutPrompt`, which shows KDE's own confirmation. Not exercised in testing.
+- **Actions (`>`):** the session actions (see "Session menu") plus reloading the shell.
+  Not exercised in testing.
 - **Keyboard:** while open the frame asks for exclusive keyboard focus (confirmed in the
   protocol trace: KWin sends `wl_keyboard.enter`), and the hole in the input region
   closes so a click outside dismisses it, as for popouts.

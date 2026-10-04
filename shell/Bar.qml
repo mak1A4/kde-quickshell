@@ -56,6 +56,8 @@ Item {
             source: Qt.resolvedUrl("modules/Power.qml")
         }
 
+        Session {}
+
     }
 
     Clock {

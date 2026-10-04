@@ -159,7 +159,7 @@ PanelWindow {
         minY: Theme.frameBorder + Theme.frameRounding + Theme.panelSmoothing
         maxY: root.height - Theme.frameBorder - Theme.frameRounding - Theme.panelSmoothing
         open: root.popoutOpen
-        contentWidth: Theme.popupWidth
+        contentWidth: content.item?.implicitWidth ?? Theme.popupWidth
         contentHeight: content.item?.implicitHeight ?? 0
         focus: root.popoutOpen
         Keys.onEscapePressed: Popouts.close()
@@ -184,7 +184,6 @@ PanelWindow {
             // stays loaded until it has slid back in
             active: root.popoutOpen || !popout.hidden
             sourceComponent: Popouts.content
-            width: Theme.popupWidth
         }
     }
 
