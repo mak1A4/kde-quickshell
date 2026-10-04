@@ -26,7 +26,7 @@ Singleton {
     // inner corners of the frame; anything above 0 covers the corners of maximized windows
     readonly property real frameRounding: 7.5
     // corners and fillets of panels growing out of the frame (dock, popouts)
-    readonly property int panelRounding: 24
+    readonly property int panelRounding: 18
     readonly property int barWidth: 48
     readonly property int barButton: 36
     readonly property int dockHeight: 60
