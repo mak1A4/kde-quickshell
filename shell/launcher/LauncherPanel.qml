@@ -20,10 +20,19 @@ Item {
     implicitWidth: 540
     implicitHeight: list.height + (list.height > 0 ? margin : 0) + empty.height + search.height + margin * 2
 
+    // Keyboard selection: moves the selection and scrolls it into view.
     function move(by) {
         if (list.count === 0)
             return;
         list.currentIndex = Math.max(0, Math.min(list.count - 1, list.currentIndex + by));
+        const top = list.currentIndex * rowHeight;
+        if (top < list.contentY)
+            scroll.to = top;
+        else if (top + rowHeight > list.contentY + list.height)
+            scroll.to = top + rowHeight - list.height;
+        else
+            return;
+        scroll.restart();
     }
 
     function focusSearch() {
@@ -46,12 +55,25 @@ Item {
         clip: true
         model: root.results
         boundsBehavior: Flickable.StopAtBounds
+        // Only the wheel and the keyboard scroll. The list must not follow the
+        // selection by itself (hovering a half-visible row would scroll it,
+        // putting another row under the pointer, and so on), and dragging with
+        // the mouse must not flick it.
+        highlightRangeMode: ListView.NoHighlightRange
+        acceptedButtons: Qt.NoButton
+        // the wheel settles on whole rows
+        snapMode: ListView.SnapToItem
         // the highlight is our own rectangle, so it can use the shell's curve
         highlightFollowsCurrentItem: false
-        highlightRangeMode: ListView.ApplyRange
-        preferredHighlightBegin: 0
-        preferredHighlightEnd: height
-        highlightMoveDuration: Theme.fadeDuration
+
+        NumberAnimation {
+            id: scroll
+
+            target: list
+            property: "contentY"
+            duration: Theme.fadeDuration
+            easing.type: Easing.OutCubic
+        }
 
         highlight: Rectangle {
             y: list.currentItem?.y ?? 0
@@ -117,7 +139,9 @@ Item {
             MouseArea {
                 anchors.fill: parent
                 hoverEnabled: true
-                // only real pointer movement selects, not the list scrolling under a still pointer
+                // Real pointer movement selects the row under it, without
+                // scrolling. A still pointer selects nothing, so the wheel or
+                // the keyboard can move the list underneath it.
                 onPositionChanged: list.currentIndex = row.index
                 onClicked: Launcher.activate(row.modelData)
             }
