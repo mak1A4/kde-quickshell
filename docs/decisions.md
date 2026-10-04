@@ -74,6 +74,37 @@ timing carried over.
 - **Hints** wait `Theme.hintDelay` (400 ms; Noctalia uses 500) before first appearing,
   then switch immediately between items.
 
+## App launcher
+
+Opened from the first button in the dock, or with `qs ipc -p <config> call launcher
+toggle` (also `open`, `close`). The dock panel itself grows into the launcher, so it is
+the same blob changing size, not a second panel. Inspiration: Caelestia's launcher (short
+result list over a search field, `>` for actions, calculator) and Noctalia's usage
+tracking.
+
+- **Apps:** Quickshell's `DesktopEntries`. Started with `kstart --application <id>`, so
+  each app gets its own systemd unit and KDE's startup handling instead of being a child
+  of the shell. `kstart` never returns for an id it cannot resolve, so it runs under
+  `timeout 5`; on failure the entry is started by Quickshell directly.
+- **Ranking:** own scorer in `launcher/search.js` (exact, prefix, word start, initials,
+  substring, letters in order; name counts most, then generic name, keywords, id,
+  comment). With no query the list is ordered by use: launch count halved per two weeks
+  since the last launch, stored in Quickshell's state dir (`launcher-usage.json`).
+- **Calculator:** `=` prefix, or plain arithmetic. `launcher/calc.js` is a hand-written
+  parser, not `eval`. Enter copies the result with `wl-copy`; `Quickshell.clipboardText`
+  did not reach the clipboard when tested.
+- **Actions (`>`):** lock, sleep, and log out / restart / shut down through KDE's
+  `org.kde.LogoutPrompt`, which shows KDE's own confirmation. Not exercised in testing.
+- **Keyboard:** while open the frame asks for exclusive keyboard focus (confirmed in the
+  protocol trace: KWin sends `wl_keyboard.enter`), and the hole in the input region
+  closes so a click outside dismisses it, as for popouts.
+- **IPC naming:** functions must not be called `show`; `qs ipc` has a `show` subcommand
+  and lists the function instead of calling it.
+
+To open it with a key: System Settings > Keyboard > Shortcuts > Add New > Command, with
+`qs ipc -p /path/to/shell call launcher toggle`. The Meta key alone is wired by KWin to
+Plasma's own launcher and was left as it is.
+
 ## Workspace indicator and show desktop
 
 A column of dots, one colour per desktop by position (`Theme.desktopColors`). The current
