@@ -237,7 +237,7 @@ PanelWindow {
     Item {
         id: dockHint
 
-        readonly property bool showing: root.dockHintItem !== null && dock.shown
+        readonly property bool showing: root.dockHintItem !== null && dock.shown && !dock.launcherOpen
         // horizontal centre of the hovered icon, in window coordinates
         property real anchorX: 0
         property real w: dockHintText.implicitWidth + Theme.padding * 2
@@ -255,14 +255,33 @@ PanelWindow {
         opacity: showing ? 1 : 0
         visible: opacity > 0
 
+        // When the launcher opens the tooltip goes at once: fading and
+        // sinking next to a dock that is growing into something else looks
+        // like two animations fighting.
         Behavior on opacity {
+            enabled: !dock.launcherOpen
+
             Anim {
                 kind: Anim.Fade
             }
         }
 
         Behavior on lift {
+            enabled: !dock.launcherOpen
+
             Anim {}
+        }
+
+        Connections {
+            target: dock
+
+            // and it must not come back by itself when the launcher closes
+            function onLauncherOpenChanged() {
+                if (dock.launcherOpen) {
+                    hintShow.stop();
+                    root.shownHint = null;
+                }
+            }
         }
 
         // glide along with the pointer once showing
