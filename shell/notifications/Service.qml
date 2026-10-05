@@ -89,6 +89,19 @@ Item {
         }
     }
 
+    // closes the notification with this id (as listed() gives it), if it is there
+    function close(id) {
+        if (!history)
+            return;
+        for (let row = 0; row < history.rowCount(); row++) {
+            const index = history.index(row, 0);
+            if (String(history.data(index, NotificationManager.Notifications.IdRole)) === id) {
+                history.close(index);
+                return;
+            }
+        }
+    }
+
     // Do not disturb as Plasma's applet switches it: "until" a date a year
     // off, or no date. Stored in KDE's notification settings.
     function setDoNotDisturb(on) {

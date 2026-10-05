@@ -319,6 +319,25 @@ again, as if nothing had been installed.
     list opened (all read), another taken back, two reloads, and clearing over IPC
     (`qs ipc call notifications clear`, the clear button's function). Not tested:
     closing a single card (live or earlier) by a click, a crash.
+- **Grouped by application** (asked for after "a bunch of Teams notifications"). The
+  list shows the history's entries, no longer KDE's model with the records under it:
+  one application with several notifications is a group, a header with its name and
+  how many, the newest card, and the rest when the header is clicked; the cross on the
+  header closes them all. An application with one notification is just its card, as
+  before, and there is no "Earlier" section any more: live notifications and records
+  of one application are one group, newest first, and most of what Teams sends is a
+  record within seconds.
+  - A card still takes a row of KDE's model where the engine has the notification
+    (picture, actions): an `Instantiator` over the model holds a row each, by id, and a
+    group's card takes it from there; otherwise the entry dressed as a row.
+  - KDE's own grouping (`groupMode`) stays off: it would group the live ones only.
+  - Jobs are not in the history; while there are some they are on top of the list.
+  - The groups and their cards are `ScriptModel`s over names and keys, so that a card
+    stays (expanded or not) while others come and go.
+  - Tested with notifications sent for it: four from one application, three taken back
+    by the sender, and one from another; the list collapsed and expanded on screen;
+    closing the group (through a temporary IPC hook); records and live ones over two
+    reloads. Not tested: clicks on the header, its cross and chevron, and a job.
 - **Actions only while they work.** KDE's engine marks a notification expired by itself
   about three minutes after it arrived if nothing else did (one minute after its
   timeout, the default counted as two) and tells its application that it is closed; the

@@ -164,6 +164,47 @@ Singleton {
         save();
     }
 
+    // ---- groups ---------------------------------------------------------------
+    //
+    // The list shows the entries by application: an application that has
+    // sent several (Teams, a message each) is one group, its newest on top,
+    // the rest behind a header. Live notifications and records alike: most
+    // of what Teams sends is a record seconds later.
+    readonly property var byKey: {
+        const byKey = {};
+        for (const entry of entries)
+            byKey[entry.key] = entry;
+        return byKey;
+    }
+    // application name -> the keys of its entries, newest first; the
+    // applications in the order of their newest entry
+    readonly property var groups: {
+        const groups = {};
+        for (const entry of entries.slice().sort((a, b) => b.created - a.created)) {
+            const name = entry.applicationName || "";
+            if (!(name in groups))
+                groups[name] = [];
+            groups[name].push(entry.key);
+        }
+        return groups;
+    }
+    readonly property list<string> groupNames: Object.keys(groups)
+
+    // closes everything of one application, as the cross on each card would
+    function closeGroup(name) {
+        const keys = groups[name] ?? [];
+        for (const key of keys) {
+            const entry = byKey[key];
+            if (entry?.session !== session)
+                continue;
+            dismissed[key] = true;
+            backend?.close(entry.id);
+        }
+        entries = entries.filter(entry => entry.session === session || !keys.includes(entry.key));
+        save();
+        reconcile(false);
+    }
+
     // The user closes or answers the notification with this id (as
     // Service.listed() gives it): when it goes, it goes for good.
     function dismiss(id) {
