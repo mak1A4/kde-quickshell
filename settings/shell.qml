@@ -1,6 +1,7 @@
 //@ pragma UseQApplication
 import Quickshell
 import QtQuick
+import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 
@@ -17,10 +18,14 @@ ShellRoot {
         id: kdeShortcuts
     }
 
+    BarItems {
+        id: barItems
+    }
+
     FloatingWindow {
         title: "Quickshell Settings"
-        implicitWidth: 600
-        implicitHeight: 330
+        implicitWidth: 720
+        implicitHeight: 720
         minimumSize: Qt.size(480, 270)
         color: Kirigami.Theme.backgroundColor
         onClosed: Qt.quit()
@@ -86,6 +91,8 @@ ShellRoot {
             }
 
             Kirigami.FormLayout {
+                id: shortcutForm
+
                 Layout.fillWidth: true
 
                 Kirigami.Separator {
@@ -107,9 +114,61 @@ ShellRoot {
                 }
             }
 
+            // A form of its own, its labels in line with the one above: in
+            // one form the rows of the two lists, which arrive as KDE and
+            // the tray answer, would mix.
+            Kirigami.FormLayout {
+                Layout.fillWidth: true
+                twinFormLayouts: [shortcutForm]
+                visible: barItems.keys.length > 0
+
+                Kirigami.Separator {
+                    Kirigami.FormData.isSection: true
+                    Kirigami.FormData.label: "Icons in the Bar"
+                }
+
+                // One field per module of the bar, per item in the tray, and
+                // per choice for a tray item that is not there now. A ScriptModel, so that a row is
+                // only made or removed when its item comes or goes: the form
+                // complains about every row taken from it.
+                Repeater {
+                    model: ScriptModel {
+                        values: barItems.keys
+                    }
+
+                    BarItemField {
+                        required property string modelData
+
+                        Kirigami.FormData.label: entry.label + ":"
+                        icons: barItems
+                        picker: iconPicker
+                        key: modelData
+                    }
+                }
+            }
+
+            // below the form, not in it: there it would sit among the rows,
+            // wherever they had got to when it was made
+            QQC2.Label {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.maximumWidth: Kirigami.Units.gridUnit * 28
+                visible: barItems.keys.length > 0
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                font: Kirigami.Theme.smallFont
+                opacity: 0.7
+                text: "Hidden icons appear when you click the arrow above the icons in the bar. One that is hidden while idle comes back by itself while it has something to show, like unread messages."
+            }
+
             Item {
                 Layout.fillHeight: true
             }
+        }
+
+        IconPicker {
+            id: iconPicker
+
+            icons: barItems
         }
     }
 }

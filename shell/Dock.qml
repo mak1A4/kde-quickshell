@@ -189,7 +189,14 @@ Item {
             Loader {
                 id: launcherLoader
 
-                anchors.horizontalCenter: parent.horizontalCenter
+                // Centred by hand: the panel is centred on the screen and its
+                // width is animated, and this exactly undoes the panel's own
+                // movement, so the content stands still. A centre anchor
+                // places by whole and half pixels depending on whether the
+                // panel's width is odd: the content wobbled by up to a pixel
+                // while the panel grew, and slid sideways as the width
+                // settled after overshooting.
+                x: (panel.width - width) / 2
                 anchors.bottom: parent.bottom
                 active: root.launcherOpen || opacity > 0
                 opacity: root.launcherOpen ? 1 : 0

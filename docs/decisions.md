@@ -41,6 +41,25 @@ anything else is a normal window). As a normal window the shell was hidden by sh
 desktop along with everything else; as a dock it stays. The namespace is fixed when the
 surface is created, so changing it needs a restart, not a reload.
 
+**The keyboard goes back to the window that had it.** The frame is one surface that
+asks for the keyboard while something in it is typed into (the launcher, the palette,
+the notification list: exclusively; a popout: once clicked). KWin makes it the active
+window then, and leaves it that when it stops asking; a surface that was unmapped
+instead would not have this. Seen with the frame's `Window.active` and KWin's
+`workspace.activeWindow`: after Escape in the palette nothing could be typed into any
+window until one was clicked. So `LastWindow.qml` reads the task model's active window
+just before the frame asks, and the frame activates it again 60 ms after it has stopped
+asking, if it is still the active one itself. Running something that may open a window
+(an application, a KRunner result, a shell action) says so first, and the frame waits
+2 s for it: activating the old window at once took the new one's right to the focus
+(KCalc started from the palette opened behind the terminal). Something run that opens
+nothing gets the keyboard back to the old window after those 2 s. With nothing
+remembered (the shell reloaded while it had the keyboard, as "Reload shell" does) the
+topmost window of the desktop is activated instead, by the task model's stacking order.
+Tested for the palette, the launcher and the list closed by IPC and by Escape, for an
+application started from the palette, and for a reload under the open launcher. Not
+tested: a popout that was clicked into, a second screen.
+
 If the frame ever swallows clicks: `pkill -x qs` from KRunner (Alt+Space).
 
 ## Frame and panels are one distance-field shape; motion follows Caelestia
@@ -90,6 +109,11 @@ timing carried over.
   out at once but waits `Theme.swapDelay` before fading in, so the two never overlap.
   The dock's icon row also stays on the dock's own strip at the bottom while the panel
   is launcher-sized.
+- **The active window in the dock** has a rounded square behind its icon, tinted with
+  the current desktop's colour (`Theme.desktopColors`, as its dot in the bar), so the
+  dock says which window and which desktop. Tried and dropped on 2026-10-05: a small
+  accent bar under the icon (with a grey square), and the icon lifted with a pool of
+  accent-coloured light under it and no square.
 - **Hints** wait `Theme.hintDelay` (400 ms; Noctalia uses 500) before first appearing,
   then switch immediately between items.
 
@@ -120,6 +144,15 @@ the same blob changing size, not a second panel. Inspiration: Caelestia's launch
 result list over a search field, `>` for actions, calculator) and Noctalia's usage
 tracking.
 
+- **The content stands still while the panel grows.** The panel is centred on the screen
+  and its width is animated, overshooting a little before it settles; the content is
+  placed in it with `x: (panel.width - width) / 2`, which undoes the panel's movement
+  exactly. With `anchors.horizontalCenter` it did not: a centre anchor uses whole or
+  half pixels depending on whether the parent's width, cut to an integer, is odd
+  (`alignWhenCentered` on the content does not change how the parent's centre is
+  taken). Logged per frame, the content jumped within one pixel while the panel grew and
+  slid 0.4 px to the right as the width settled, seen as the icons shifting once the
+  animation was over. Now every frame has the same position.
 - **Apps:** Quickshell's `DesktopEntries`. Started with `kstart --application <id>`, so
   each app gets its own systemd unit and KDE's startup handling instead of being a child
   of the shell. `kstart` never returns for an id it cannot resolve, so it runs under
@@ -223,6 +256,59 @@ again, as if nothing had been installed.
   touched, only unreachable meanwhile, so it resumes exactly as it was. Measured: the
   shell is the service within the second it starts; killed with `kill -9`, Plasma has the
   names back after about 50 ms.
+- **The list survives a reload of the configuration** (it did not: a Teams message was
+  missed on a morning of editing the shell, every saved file emptied the list and put
+  out the light). The notifications are KDE's engine's, in the process, and the engine
+  keeps them for as long as one model on them exists. Quickshell builds the new
+  configuration before it drops the old one (`EngineGeneration::onReload`), so there is
+  a moment with both. Three things were needed:
+  - The new models are made at once, in that moment (`wanted` starts out as "this
+    process is the service"). They used to wait for the announcement on the bus, which
+    is asked for anew on every load and answered after the old models had gone, and the
+    engine's notifications with them.
+  - A model of KDE's, newly made, shows nothing of what the engine already holds, only
+    what arrives from then on, until one of its filters is set, even to what it was
+    (found by trying: 17 notifications were there after as many reloads, and the list
+    empty; setting `showDismissed` or `urgencies` brought them, the sort order did
+    not). So each model has `showDismissed` set once when made.
+  - The count of unread ones is the service's own and goes with it; a
+    `PersistentProperties` in `Notifications.qml` carries it over.
+  A notification that arrives during a reload is kept too, the engine never being
+  without a model. Tested: count and unread over six reloads in a row, the first reload
+  after a start of the shell, and reading the list before a reload.
+- **A history on disk, so that nothing is missed over a restart** (asked for after the
+  above: "a proper notification history"). The engine and its notifications end with
+  the process: a restart of the shell, a crash, a logout. So everything in the list is
+  also written to `notifications.json` in the shell's state directory, within 100 ms of
+  arriving, and what a past run left there is shown under the list as "Earlier" until
+  it is closed or the list is cleared. Plasma has nothing like it: its history is gone
+  with plasmashell.
+  - An earlier one is a record: text, time, icons, urgency. Its application no longer
+    knows it, so it has no actions and a click only expands it. A notification's own
+    picture is not kept.
+  - The file follows the list (`Notifications.reconcile()`, from `Service.listed()`):
+    what is in the list is in the file; what the user or its application closes goes
+    from the file too. Jobs and transient notifications are not written.
+  - Which entries are this run's is told by a `session`: boot id, process id and the
+    process's start time from `/proc`. It is the same over a reload and never the same
+    after a restart; the process id alone can repeat from one boot to the next.
+  - If the list comes back from a reload without something the file has for this run,
+    the engine lost it (as it did before the fix above), and the entry is kept as a
+    record instead of being taken for closed.
+  - How many were unread is in the file too, so the light is on again after a restart.
+  - At most 200 earlier ones are kept. The file holds the text of notifications
+    (messages, mail subjects) in the clear, readable like the rest of the home
+    directory.
+  - Tested: two notifications over two reloads, then a restart of the shell (they come
+    back as "Earlier", unread), a third after it, more reloads; the list on screen.
+    Not tested: closing an earlier one, the clear button, a crash.
+- **Actions only while they work.** KDE's engine marks a notification expired by itself
+  about three minutes after it arrived if nothing else did (one minute after its
+  timeout, the default counted as two) and tells its application that it is closed; the
+  list's first design ("left open towards its application") did not reckon with that.
+  Decided: nothing is done against it; an expired card shows no action buttons and a
+  click on it does not run the default action. Not tested on screen (it needs a
+  notification with actions and three minutes).
 - **No keeper, no stored state.** The announcement is a bus name, and the bus drops it
   when the process ends, however it ends. Nothing is written anywhere that a crash or a
   logout could leave behind.
@@ -257,12 +343,30 @@ again, as if nothing had been installed.
     was tested there first; a bug in it inside plasmashell leaves the desktop without
     notifications until plasmashell is restarted.
 - **Quiet by default (2026-10-05).** Only critical notifications pop up. Everything else
-  goes straight into a list behind a bell in the bar (`modules/Bell.qml`,
-  `notifications/NotificationList.qml`): a dot on the bell, with a ring spreading from it
-  every two seconds, says some have arrived since the list was last open. Left click (or
-  `qs ipc call notifications toggle`, or the "Show notifications" shortcut) opens the
-  list as a popout: the same cards, do not disturb, clear, System Settings. Middle click
-  on the bell switches do not disturb.
+  goes straight into a list (`notifications/NotificationList.qml`) that lives in the
+  frame's bottom left corner:
+  - While there are notifications, that corner is rounded much further than the
+    others (radius 54, or 72 while some are unread, against 7.5): one even curve from the
+    left border to the bottom one. The frame shader gives the hole's bottom left corner
+    a radius of its own for this. In the space that fills sits a light. While some
+    notifications have not been looked at, it calls: the dot breathes, ripples spread
+    from it over the corner, its colour drifts between the accent and mauve
+    (`shaders/orb.frag`, on a canvas larger than the corner; it takes no input). Read,
+    the light is a dim, still dot; so too in do not disturb.
+    First the corner swelled into a small rounded tab instead (a panel in the shader,
+    merged with the border): with a fillet on either side it read as a bulge, and one
+    curve was wanted.
+  - A click there and the list grows out of the corner (`widgets/CornerPanel.qml`, a
+    fifth panel in the shader), as the dock grows into the launcher.
+    Escape or a click elsewhere closes it (it has the keyboard while open, like the
+    launcher). Middle click switches do not disturb. With no
+    notifications the corner is like the others; the corner of the border itself (45 px
+    of each side) opens the empty list. Also `qs ipc call notifications toggle` and the "Show
+    notifications" shortcut.
+  - First came a bell in the bar with a dot and a ring on it, the list as a popout
+    beside it. It worked; something less like a taskbar icon was wanted.
+  - A rebuilt `.qsb` is only used after the shell has been restarted: the running
+    process keeps the shader it loaded, across reloads.
   - **Not expired, only not shown.** KDE's engine has "expire" for a popup that has had
     its time, and the first version expired everything at once. But expiring tells the
     application its notification is closed and removes its actions: nothing in the list
@@ -309,7 +413,9 @@ again, as if nothing had been installed.
     split. Other shells: Caelestia tints the application's icon to one colour, end-4
     puts it in colour on a disc and guesses a glyph from the title otherwise,
     DankMaterialShell shows the application's icon or its initial.
-  - A notification's own picture is shown round in the icon's place, with the icon small
+  - A notification's own picture is shown in the icon's place, filling it, with rounded
+    corners and nothing behind it (it was round on a disc; Kirigami drew the picture at
+    32 px in the 42 and the disc showed as a ring around it), with the icon small
     on its corner.
   - Cards start collapsed: title with its age ("now", "5m"), one line of the body. The
     arrow (only there if something is cut off) or a click expands to the application's
@@ -331,12 +437,48 @@ once, timeout, a critical one staying, closing over D-Bus, a job's progress bar 
 pretend copy reported to the job tracker). With the virtual pointer: hover showing the
 cross, the cross, middle click, expand by arrow, collapse by click, dragging a card
 away, a short drag snapping back, an action button (the sending `notify-send` reported
-the action). The quiet mode: nothing but critical ones popping up, the dot and its count,
-the list opening, an action clicked in the list reaching its sender, clear, do not
-disturb by middle click (KDE's setting written and removed, the bell's look, only the
-critical one popping up during it), a transient notification dropped. Not tested: the
+the action). The quiet mode: nothing but critical ones popping up, the count of unread
+ones, an action clicked in the list reaching its sender, clear, do not disturb (KDE's
+setting written and removed, only the critical one popping up during it), a transient
+notification dropped. The corner: the tab and the light by screenshot, and with the
+pointer and keys a click opening the list, Escape and a click elsewhere closing it,
+middle click for do not disturb, the border's corner opening the empty list. Not tested: the
 default action, a link in the body, a job's Pause and Cancel, the do-not-disturb switch
 inside the list (only the middle click), a real sandboxed application, real file copies.
+
+## Plasma's panels are parked while the shell runs
+
+While the shell runs, plasmashell's panels are moved 10000 px down, off the screen, by a
+KWin script (`kwin/park-panels.js`), and moved back when the shell is gone
+(`kwin/unpark-panels.js`). A keeper process (`shell/panels.sh`, started by
+`PlasmaPanels.qml`) loads the script over KWin's scripting D-Bus interface and outlives
+the shell to undo it, with the same two locks as the shortcuts' keeper. Nothing in Plasma
+is changed: the panel, its widgets (the tray with Klipper and the notification helper
+among them) and its settings stay as they are and keep running.
+
+- **Why at all:** an auto-hidden Plasma panel comes up when the pointer pushes against
+  its edge, here the bottom one, where the shell's dock lives.
+- **Why KWin and not Plasma:** a panel has no hidden mode, only always visible,
+  auto-hide, dodge windows and windows go below. Its window (`PanelView`) can be hidden
+  from QML inside plasmashell, but nothing gives a widget that window unless the widget
+  is shown in the panel: a hidden tray widget has no parent item and no window, the
+  shell's corona offers no way to its panel views, and a widget shown in the tray of an
+  auto-hidden panel is only created once the panel has been drawn. Plasma's scripting
+  can only shrink or move a panel, which changes its saved settings.
+- **What KWin offers:** a script can set a layer-shell window's `frameGeometry`. KWin
+  lays a panel out again whenever Plasma changes something about it, so the script parks
+  it again on every geometry change, and parks panels that appear later (plasmashell
+  restarted).
+- **Off screen, the edge is gone too:** pushed against the bottom edge with a relative
+  pointer, the panel stays hidden with the shell running, and comes up as ever with the
+  shell stopped.
+- **Limit:** a panel that is always visible reserves its strip of the screen through
+  the layer-shell protocol, and moving its window does not give that back. Not handled;
+  the one panel here auto-hides. Desktop widgets are not touched either.
+
+Tested: where KWin has the panel with the shell running, stopped, started, killed,
+restarted at once, and after restarting plasmashell; the edge push in both states; the
+panel's settings in Plasma unchanged afterwards.
 
 ## Clipboard history in the palette
 
@@ -472,6 +614,10 @@ window). The first test moved the cursor onto the user's browser, because the
 notifications it was meant for had been closed meanwhile; nothing was clicked only because
 that step was a hover.
 
+An absolute device cannot push against a screen edge, which is what brings an
+auto-hidden panel up. For that, a relative one: a uinput device with `REL_X`/`REL_Y`,
+sending a run of movements towards the edge.
+
 ## Testing keys: a virtual keyboard
 
 `tools/keys.py` presses keys through uinput (python-evdev; `/dev/uinput` is writable for
@@ -554,6 +700,102 @@ Phase 0). Anything chatty should move to a C++ plugin.
 foreground colour instead of the Plasma colour scheme's. It also accepts the `QIcon`
 from `TasksModel.decoration`, which plain `Image` cannot. Kirigami is a hard dependency;
 on Plasma it is always present. Tray icons are pixmaps and use Quickshell's `IconImage`.
+
+**Tray items in the bar's own style.** A tray icon in colour (Outlook, Teams, the
+portal's "Remote Control") stood out among the one-colour icons of the bar. An item can
+be drawn through `widgets/Icon.qml` instead, with an icon chosen for it; every other item
+keeps the icon it brings.
+- **Chosen in the settings window**, section "Icons in the Bar": one row per item in the
+  tray (and per choice for an item that is not there now, to forget it). The button opens
+  a list of every icon there is to choose from, with a search field: the Tabler glyphs in
+  `shell/icons/tabler` and the icon theme's one-colour icons, which are its symbolic
+  icons and Papirus' `panel` directories (tray icons for many applications, e.g.
+  `teams-for-linux-tray`); `shell/icons.sh` lists them, about 6000 here. They are
+  drawn in one colour, as the bar will. A click sets the icon at once and the bar shows
+  it, so the list stays open for trying another. Below it: "Its Own Icon", and "Default"
+  where the shell has one.
+- **Kept in** `~/.config/kde-quickshell/bar-items.json`, written by the settings and
+  read again by the shell whenever it changes (`shell/BarItems.qml`): per item key an
+  `icon` (a theme name, `tabler/<name>`, or `""` for the item's own) and a `hide`
+  (`"always"` or `"idle"`), either or both. An item with nothing chosen has no entry.
+- **Hiding.** Each row also says when the item is in the bar: shown, hidden while idle,
+  or hidden. A hidden item is not gone: while anything is hidden an arrow sits on top of
+  the bar's lower group, a click on it brings the hidden items into the bar in their
+  places and a second click puts them away (also `qs ipc call bar toggleHidden`). One
+  hidden while idle comes back by itself while its status is "needs attention" or its
+  tooltip has a count. The status "passive" is not used for this: Electron applications
+  are "active" all the time, so it says nothing for the items one would hide (Teams).
+- **The bar's own modules too** (media, KDE Connect, network, volume, power, session):
+  the section is called "Icons in the Bar", and a list of only the tray's three was
+  asked about at once. They have a row each, shown or hidden, and no icon to choose:
+  a module draws its state (the volume, the kind of network, play or pause). The row
+  shows the icon the module has in the bar at that moment: `widgets/Icon.qml` reports a
+  module's icon to `BarItems`, and the settings ask the running shell every 3 s
+  (`qs ipc call bar moduleIcons`). A fixed stand-in per module was there first and was
+  asked about at once ("shouldn't this be the icon we actually use?"); it is now only
+  for when the shell is not running. One of them, `battery-profile-balanced-symbolic`,
+  which Papirus leaves to Breeze, came out as a filled disc at the window's 22 px (cause
+  not found), so every icon in the list is now drawn as the bar draws it: in an 18 px
+  square, which Kirigami rounds to the 16 px drawing, glyphs at 21 px. Which
+  modules there are is a list in `symbols.js`; each calls `BarItems.tucked("<name>")`.
+  Putting away is `BarButton`'s (`tucked`): the cell shrinks to nothing and is then
+  invisible, so the layout gives it no spacing either; `Guarded` follows its module's
+  height for the same reason. Known gap: a hidden module that shows nothing anyway (the
+  media player without a player) still counts, so the arrow can be there with nothing
+  behind it.
+- **An item's own icon, if it is one of the theme's one-colour icons, is drawn in the
+  bar's colour** (a name ending in `-symbolic`, or in the list `icons.sh` gives, which
+  the shell reads once at its start). KDE's microphone indicator names
+  `microphone-sensitivity-high`, a Papirus panel icon: drawn as it comes it has the
+  theme's colour for text on a light panel, dark grey on the dark bar. An icon in
+  colour is still drawn as it comes. Tried first: Kirigami's icon without the mask and
+  with the bar's colour, in the hope that only the icon's text colour would be
+  replaced; in this process it replaces nothing. Tested with tray items made for it
+  (PyQt's `QSystemTrayIcon` with a theme icon): the microphone, its muted form (dim,
+  as the theme draws it) and an application's icon in colour. A Python test item does
+  not end on SIGTERM unless the default handler is put back; nine of them stayed in
+  the user's bar for some minutes.
+- **Defaults** are in `modules/tray/symbols.js`: Outlook, Teams and Remote Control have an
+  icon unasked. An item is recognised by the icon it names (`krfb`) or by a word in its
+  id, title or tooltip.
+- **The key** a choice is filed under is the item's id (with its title, if it has one).
+  Electron applications send only a pixmap and an id like `chrome_status_icon_1`, so for
+  Outlook the tooltip without its count is the key.
+- **The same cell for every item.** A tray item is a `BarButton` like the other modules,
+  with the bar's spacing (before: 30 px rows without spacing, closer together than the
+  rest, which were 36 px cells 3 px apart). With all of them 39 px apart the lower group
+  was too loose, so every cell is now 30 px high with none between
+  (`Theme.barButtonHeight`, `Theme.barSpacing`): 12 px from one icon to the next. The icon is centred in the bar's 18 px square whatever it is. A Tabler glyph is
+  drawn at 21 px without Kirigami's rounding to standard sizes: it keeps an eighth of its
+  width clear on every side, where the theme's symbolic icons (which Kirigami draws at
+  16 px in that square) nearly reach the edges, so at 18 px it looked smaller than its
+  neighbours.
+- Teams paints its unread count into its pixmap, which a replacement loses. The count
+  is also at the end of the tooltip ("Microsoft Teams (2)"): when one is there, the icon
+  gets a dot.
+- `settings/symbols.js` is a link to the shell's: both sides must agree on keys and on
+  how an icon is written, and Quickshell loads no script from outside a config's own
+  directory (`import "../shell/..."` fails with "qs-blackhole").
+- **Tried and dropped:** KDE's icon chooser (`org.kde.iconthemes` `IconDialog`). It opens
+  on the theme's application icons in colour, and its `customLocation` did not show the
+  Tabler directory. A general rule that takes `<name>-symbolic` whenever the theme has
+  it: `Kirigami.Icon` reports `valid` for names the theme does not have, so the shell
+  cannot tell. The tray rows in the shortcuts' `FormLayout`: rows arrive as KDE and the
+  tray answer and the form keeps them in that order, so the lists mixed (as did a note
+  put after the rows, now below the form); and it warns about every row taken from it,
+  hence a `ScriptModel` over the keys.
+- Under an icon theme without a chosen name the item shows Kirigami's "unknown" icon.
+  Only the Tabler glyphs that `tools/tabler.sh` has fetched are offered (those the
+  notifications use). Editing `symbols.js` does not reload the shell; restart it.
+- Tested: the settings' code headless (list of items; choosing, resetting, hiding and
+  forgetting, and the file after each); a choice written by it showing in the running
+  bar and going again on reset; hidden items leaving the bar, coming with the arrow's
+  toggle (over IPC) and going again, the same with two modules; the list of icons on screen, opened by a timer; the
+  window's layout drawn off screen (`grabToImage` under `QT_QPA_PLATFORM=offscreen`,
+  which has no icon theme). Not tested: clicks in the window, in the list and on the
+  arrow, and an item coming back from "hidden while idle" (nothing had a count then).
+- A screenshot of "the active window" (`spectacle -a`) right after starting the settings
+  took the user's browser instead when that kept the focus. Draw off screen instead.
 
 ## Tray menus are drawn by the shell
 

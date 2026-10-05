@@ -18,6 +18,7 @@ BarButton {
     readonly property real volume: available ? sink.audio.volume : 0
     readonly property bool muted: available && sink.audio.muted
 
+    tucked: BarItems.tucked("audio")
     active: Popouts.current === "audio"
     hintTitle: available ? (sink.description || sink.name) : "No audio output"
     hintLines: available ? [muted ? "Muted" : `Volume ${Math.round(volume * 100)}%`] : []
@@ -52,6 +53,7 @@ BarButton {
 
     Icon {
         Layout.alignment: Qt.AlignHCenter
+        module: "audio"
         color: root.available ? Theme.fg : Theme.error
         source: {
             if (!root.available || root.muted || root.volume === 0)

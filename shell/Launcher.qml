@@ -25,6 +25,7 @@ Singleton {
         screen = onScreen ?? Quickshell.screens[0] ?? null;
         Popouts.close();
         CommandPalette.hide();
+        Notifications.listOpen = false;
         query = "";
         open = true;
     }
@@ -154,6 +155,7 @@ Singleton {
     function launch(entry) {
         recordLaunch(entry.id);
         starter.createObject(root, { entry: entry });
+        LastWindow.expectWindow();
         hide();
     }
 
@@ -270,6 +272,7 @@ Singleton {
             Quickshell.execDetached(["wl-copy", "--", result.value]);
             hide();
         } else if (result.kind === "action") {
+            LastWindow.expectWindow();
             hide();
             runAction(result.action);
         }

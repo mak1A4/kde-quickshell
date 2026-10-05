@@ -34,6 +34,7 @@ Singleton {
         screen = onScreen ?? Quickshell.screens[0] ?? null;
         Popouts.close();
         Launcher.hide();
+        Notifications.listOpen = false;
         runner.active = true;
         clips = [];
         mode = inMode ?? "";
@@ -274,6 +275,7 @@ Singleton {
             Quickshell.execDetached(["sh", Quickshell.shellPath("clipboard.sh"), "copy", result.uuid]);
             hide();
         } else if (result.kind === "action") {
+            LastWindow.expectWindow();
             hide();
             Launcher.runAction(result.action);
         } else if (result.kind === "match") {
@@ -287,6 +289,7 @@ Singleton {
                 Quickshell.execDetached(["wl-copy", "--", bare ? number[0].trim() : result.title]);
                 hide();
             } else if (backend.run(index, result.id, action)) {
+                LastWindow.expectWindow();
                 hide();
             }
         }

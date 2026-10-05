@@ -19,6 +19,9 @@ Item {
 
     implicitWidth: failed ? error.implicitWidth : loader.implicitWidth
     implicitHeight: failed ? error.implicitHeight : loader.implicitHeight
+    // a module put away (BarButton.tucked) has no height: then no cell, and
+    // none of a layout's spacing, for this either
+    visible: implicitHeight > 0
 
     Loader {
         id: loader

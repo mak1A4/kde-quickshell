@@ -3,6 +3,7 @@ import QtQuick
 
 ShellRoot {
     Hotkeys {}
+    PlasmaPanels {}
 
     Variants {
         model: Quickshell.screens

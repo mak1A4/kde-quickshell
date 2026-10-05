@@ -35,6 +35,7 @@ Singleton {
         }
         Launcher.hide();
         CommandPalette.hide();
+        Notifications.listOpen = false;
         root.anchorItem = anchorItem;
         root.content = content;
         current = name;

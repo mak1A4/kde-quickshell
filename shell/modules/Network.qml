@@ -9,6 +9,7 @@ import qs.widgets
 BarButton {
     id: root
 
+    tucked: BarItems.tucked("network")
     readonly property bool available: Networking.backend !== NetworkBackendType.None
     readonly property var devices: Networking.devices.values
     readonly property NetworkDevice wired: devices.find(d => d.type === DeviceType.Wired && d.connected) ?? null
@@ -42,6 +43,7 @@ BarButton {
 
     Icon {
         Layout.alignment: Qt.AlignHCenter
+        module: "network"
         color: !root.available ? Theme.error : (root.limited ? Theme.warning : Theme.fg)
         source: {
             if (!root.available)

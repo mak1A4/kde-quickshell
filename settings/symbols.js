@@ -1,0 +1,1 @@
+../shell/modules/tray/symbols.js

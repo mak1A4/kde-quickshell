@@ -30,9 +30,28 @@ Item {
             bottomMargin: Theme.frameBorder + Theme.spacing
             horizontalCenter: parent.horizontalCenter
         }
-        spacing: 3
+        spacing: Theme.barSpacing
 
-        Bell {}
+        // Only there while something below is hidden (BarItems): a click
+        // brings the hidden items into the bar, each in its place, a second
+        // one puts them away. The group grows upward, being anchored at its
+        // lower end.
+        BarButton {
+            visible: BarItems.hiddenCount > 0
+            hintTitle: BarItems.expanded ? "Hide again" : BarItems.hiddenCount === 1 ? "1 hidden icon" : `${BarItems.hiddenCount} hidden icons`
+            onClicked: BarItems.expanded = !BarItems.expanded
+
+            Icon {
+                Layout.alignment: Qt.AlignHCenter
+                source: "go-up-symbolic"
+                rotation: BarItems.expanded ? 180 : 0
+
+                Behavior on rotation {
+                    Anim {}
+                }
+            }
+        }
+
         Media {}
         Tray {
             Layout.alignment: Qt.AlignHCenter

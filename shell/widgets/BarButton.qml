@@ -17,12 +17,21 @@ Rectangle {
     property string hintTitle: ""
     property list<string> hintLines: []
 
+    // Put away (an item the user has hidden, see BarItems): it takes no room,
+    // and grows back into its place when shown again.
+    property bool tucked: false
+    property real shownPart: tucked ? 0 : 1
+
     signal clicked(int button)
     // +1 per wheel notch up, -1 per notch down
     signal scrolled(int steps)
 
     implicitWidth: Theme.barButton
-    implicitHeight: Math.max(Theme.barButton, column.implicitHeight + Theme.spacing * 2)
+    implicitHeight: Math.max(Theme.barButtonHeight, column.implicitHeight + Theme.spacing * 2) * shownPart
+    opacity: shownPart
+    // no cell, and none of the layout's spacing, for what is put away
+    visible: implicitHeight > 0
+    clip: shownPart < 1
     radius: 9
     color: {
         if (highlighted)
@@ -34,6 +43,10 @@ Rectangle {
 
     Behavior on color {
         ColorAnim {}
+    }
+
+    Behavior on shownPart {
+        Anim {}
     }
 
     // separate from the MouseArea so non-interactive buttons report hover too

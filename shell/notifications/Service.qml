@@ -43,9 +43,43 @@ Item {
     property int unread: 0
     // the list is open: what arrives is seen
     property bool listOpen: false
+    // the models are taking up what the engine already holds (see the
+    // models): that is not what arrives
+    property bool restoring: false
 
     onListOpenChanged: unread = 0
     onHistoryChanged: sync()
+
+    // something in the list arrived, went or was changed
+    signal touched
+
+    // What is in the list, newest first, as plain data: for the history on
+    // disk (../Notifications.qml). null while there is no list. Without jobs
+    // (a file copy is not news once it is over) and without what is about to
+    // be dropped.
+    function listed() {
+        if (!history)
+            return null;
+        const Roles = NotificationManager.Notifications;
+        const rows = [];
+        for (let row = 0; row < history.rowCount(); row++) {
+            const index = history.index(row, 0);
+            if (history.data(index, Roles.TypeRole) === Roles.JobType || history.data(index, Roles.TransientRole))
+                continue;
+            const created = history.data(index, Roles.CreatedRole);
+            rows.push({
+                id: String(history.data(index, Roles.IdRole)),
+                created: created && !isNaN(created.getTime()) ? created.getTime() : Date.now(),
+                applicationName: history.data(index, Roles.ApplicationNameRole) ?? "",
+                applicationIconName: history.data(index, Roles.ApplicationIconNameRole) ?? "",
+                iconName: history.data(index, Roles.IconNameRole) ?? "",
+                summary: history.data(index, Roles.SummaryRole) ?? "",
+                body: history.data(index, Roles.BodyRole) ?? "",
+                urgency: history.data(index, Roles.UrgencyRole) ?? Roles.NormalUrgency
+            });
+        }
+        return rows;
+    }
 
     function sync() {
         count = history ? history.rowCount() : 0;
@@ -130,10 +164,21 @@ Item {
     // restarted), they go, and return once its helper has let go again.
     // Decided in a function, a moment later, and not in a binding: creating
     // the models changes what the decision depends on.
-    property bool wanted: false
+    //
+    // Except when the shell reloads its configuration. KDE's library keeps
+    // the notifications for as long as one model on them exists, and the
+    // process stays the service throughout. So the models of the new
+    // configuration are made at once, while those of the old one are still
+    // there (Quickshell builds the new one first), and the notifications
+    // pass from one to the other: nothing in the list is lost, none that
+    // arrives meanwhile is dropped, and each stays open towards its
+    // application. Made a moment later, they found the list empty. The
+    // announcement is not waited for either: it is asked for anew on every
+    // load and answered late, and the process that is the service has it.
+    property bool wanted: NotificationManager.Server.valid
 
     function decide() {
-        wanted = announced && (serving || !service.registered);
+        wanted = serving || (announced && !service.registered);
     }
 
     onAnnouncedChanged: Qt.callLater(decide)
@@ -146,6 +191,23 @@ Item {
         sourceComponent: Item {
             readonly property alias popups: popups
             readonly property alias history: history
+
+            // A model of KDE's, newly made, shows nothing of what the engine
+            // already holds, only what arrives from then on, until one of
+            // its filters is set, be it to what it was. So each has one set
+            // once. This is the second half of keeping the list when the
+            // shell reloads its configuration (the first is `wanted`): the
+            // notifications were all still there, 17 of them after as many
+            // reloads, and the list empty.
+            Component.onCompleted: {
+                root.restoring = true;
+                for (const model of [popups, quiet, history]) {
+                    model.showDismissed = !model.showDismissed;
+                    model.showDismissed = !model.showDismissed;
+                }
+                root.restoring = false;
+                root.sync();
+            }
 
             NotificationManager.Notifications {
                 id: popups
@@ -220,7 +282,8 @@ Item {
                 groupMode: NotificationManager.Notifications.GroupDisabled
                 urgencies: NotificationManager.Notifications.CriticalUrgency | NotificationManager.Notifications.NormalUrgency | NotificationManager.Notifications.LowUrgency
                 onRowsInserted: (parent, first, last) => {
-                    if (root.listOpen) {
+                    root.touched();
+                    if (root.listOpen || root.restoring) {
                         root.sync();
                         return;
                     }
@@ -232,8 +295,15 @@ Item {
                     }
                     root.sync();
                 }
-                onRowsRemoved: root.sync()
-                onModelReset: root.sync()
+                onRowsRemoved: {
+                    root.sync();
+                    root.touched();
+                }
+                onModelReset: {
+                    root.sync();
+                    root.touched();
+                }
+                onDataChanged: root.touched()
             }
         }
     }

@@ -13,14 +13,19 @@ import "glyphs.js" as Glyphs
 // a dimmed icon. Where the system speaks (a battery, the network, a plain
 // "information") or there is no icon at all, a Tabler glyph sits on a disc
 // whose colour says how urgent it is: see glyphs.js. A notification's own
-// picture takes the icon's place, round, with the icon small on its corner.
+// picture takes the icon's place, with rounded corners and nothing behind
+// it, with the icon small on its corner.
 //
 // A card starts collapsed: title with its age, one line of the body, the
 // action buttons. The arrow, or a click where there is no default action,
 // expands it to the application's name and the whole text. For a job (a file
 // copy, a download) the progress and its controls are always there.
 //
-// A click runs the default action. The cross, a middle click, or dragging
+// A click runs the default action. An expired notification has none, and no
+// action buttons: KDE's engine expires one by itself about three minutes
+// after it arrived, its application is then told it is closed, and the
+// actions would do nothing. So has a record of a past run of the shell (see
+// Notifications.qml). The cross, a middle click, or dragging
 // the card off to the side closes it for good. Left alone it goes into the
 // history after its time; hovering holds it.
 Rectangle {
@@ -42,6 +47,8 @@ Rectangle {
     readonly property bool expandable: expanded || summary.truncated || bodyText.truncated
 
     readonly property bool isJob: model.type === 2
+    // its application still knows it: the actions work
+    readonly property bool answerable: !(model.expired ?? false)
     // 1: low, 2: normal, 4: critical
     readonly property bool critical: model.urgency === 4
     readonly property bool low: model.urgency === 1
@@ -159,7 +166,7 @@ Rectangle {
         onClicked: mouse => {
             if (mouse.button === Qt.MiddleButton)
                 root.notifications.close(root.modelIndex());
-            else if (root.model.hasDefaultAction)
+            else if (root.model.hasDefaultAction && root.answerable)
                 root.notifications.invokeDefaultAction(root.modelIndex());
             else if (root.expandable)
                 root.expanded = !root.expanded;
@@ -182,12 +189,15 @@ Rectangle {
             implicitWidth: 42
             implicitHeight: 42
 
-            // the notification's own picture, round
+            // The notification's own picture, filling the space. It was
+            // round, on a disc: Kirigami drew it at the next smaller
+            // standard icon size, 32 px in the 42, and the disc showed
+            // around it as a ring.
             ClippingRectangle {
                 anchors.fill: parent
                 visible: picture.valid
-                radius: width / 2
-                color: Theme.surfaceHover
+                radius: 9
+                color: "transparent"
 
                 Icon {
                     id: picture
@@ -196,6 +206,7 @@ Rectangle {
                     source: root.model.image ?? ""
                     fallback: ""
                     colorize: false
+                    roundToIconSize: false
                 }
             }
 
@@ -368,7 +379,7 @@ Rectangle {
                 Repeater {
                     id: actions
 
-                    model: root.isJob ? [] : (root.model.actionLabels ?? [])
+                    model: root.isJob || !root.answerable ? [] : (root.model.actionLabels ?? [])
 
                     Button {
                         required property string modelData

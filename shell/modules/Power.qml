@@ -15,6 +15,7 @@ BarButton {
     readonly property bool hasBattery: batteryModel.hasInternalBatteries
     readonly property bool charging: batteryModel.state === Battery.BatteryControlModel.Charging
 
+    tucked: BarItems.tucked("power")
     active: Popouts.current === "power"
     hintTitle: {
         if (hasBattery)
@@ -62,6 +63,7 @@ BarButton {
 
     Icon {
         Layout.alignment: Qt.AlignHCenter
+        module: "power"
         // accent while sleep and screen locking are manually blocked
         color: inhibitionControl.isManuallyInhibited ? Theme.accent : Theme.fg
         source: {

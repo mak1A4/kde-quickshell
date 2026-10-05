@@ -15,7 +15,7 @@ PanelWindow {
     readonly property real innerRight: width - Theme.barWidth
     readonly property bool popoutOpen: Popouts.current !== "" && within(Popouts.anchorItem, bar)
     // a popout, the launcher or the palette: something that a click elsewhere dismisses
-    readonly property bool modal: popoutOpen || dock.launcherOpen || commandPalette.showing
+    readonly property bool modal: popoutOpen || dock.launcherOpen || commandPalette.showing || notificationCorner.listOpen
 
     // Hovered item with a hint. A hint waits Theme.hintDelay before it first
     // appears; once one is showing, moving to another item switches at once.
@@ -93,8 +93,53 @@ PanelWindow {
     // effects leave it alone. Any other name is a normal window to KWin.
     WlrLayershell.namespace: "dock"
     // the launcher and the palette are typed into, so they take the keyboard
-    // outright; a popout only gets it once clicked
-    WlrLayershell.keyboardFocus: dock.launcherOpen || commandPalette.showing ? WlrKeyboardFocus.Exclusive : (popoutOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
+    // outright; a popout only gets it once clicked. The notification list
+    // takes it outright as well, for Escape: getting it on a click, the shell
+    // stayed the active window after the list had closed, and the window
+    // being worked in had to be clicked to type again. KWin gives the
+    // keyboard back when an exclusive surface lets go.
+    WlrLayershell.keyboardFocus: dock.launcherOpen || commandPalette.showing || notificationCorner.listOpen ? WlrKeyboardFocus.Exclusive : (popoutOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
+
+    // KWin leaves this surface the active window when it stops asking for the
+    // keyboard, so the window that had it before is activated again
+    // (LastWindow.qml). Not if another window has become active meanwhile:
+    // one picked in the palette, or one opened by what was run, which is
+    // given `windowWait` to appear.
+    Item {
+        id: keyboard
+
+        readonly property bool wanted: root.WlrLayershell.keyboardFocus !== WlrKeyboardFocus.None
+        readonly property bool held: Window.active
+        readonly property int windowWait: 2000
+
+        // Its task model needs to have loaded by the time it is asked. And
+        // a reload while the frame had the keyboard leaves it with it.
+        Component.onCompleted: {
+            LastWindow.last;
+            giveBack.interval = 300;
+            giveBack.start();
+        }
+        onWantedChanged: {
+            if (wanted) {
+                giveBack.stop();
+                LastWindow.remember(held);
+                return;
+            }
+            // the surface's new state has to reach KWin first
+            giveBack.interval = LastWindow.expecting ? windowWait : 60;
+            LastWindow.expecting = false;
+            giveBack.restart();
+        }
+
+        Timer {
+            id: giveBack
+
+            onTriggered: {
+                if (!keyboard.wanted && keyboard.held)
+                    LastWindow.giveBack();
+            }
+        }
+    }
 
     mask: Region {
         // The click-through hole. It closes while a popout, the launcher or
@@ -111,6 +156,15 @@ PanelWindow {
             y: dock.area.y
             width: dock.area.width
             height: dock.area.height
+            intersection: Intersection.Subtract
+        }
+
+        // the notification light in the corner
+        Region {
+            x: Theme.frameBorder
+            y: root.height - Theme.frameBorder - notificationCorner.button
+            width: notificationCorner.button
+            height: notificationCorner.button
             intersection: Intersection.Subtract
         }
 
@@ -132,6 +186,7 @@ PanelWindow {
             Popouts.close();
             Launcher.hide();
             CommandPalette.hide();
+            Notifications.listOpen = false;
         }
     }
 
@@ -157,6 +212,7 @@ PanelWindow {
                 return Qt.vector4d((left + right) / 2, (top + bottom) / 2, (right - left) / 2, (bottom - top) / 2);
             }
             readonly property real innerRadius: Theme.frameRounding
+            readonly property real cornerRadius: notificationCorner.corner
             readonly property real panelRadius: Theme.panelRounding
             readonly property real smoothing: Theme.panelSmoothing
             readonly property color color: Theme.bg
@@ -164,6 +220,7 @@ PanelWindow {
             readonly property vector4d panel1: sidePanel.blob
             readonly property vector4d panel2: commandPalette.blob
             readonly property vector4d panel3: notificationPanel.blob
+            readonly property vector4d panel4: notificationCorner.blob
             readonly property vector4d bubble: dockHint.blob
             readonly property real bubbleRadius: 12
             readonly property color bubbleColor: Theme.tooltipBg
@@ -212,6 +269,142 @@ PanelWindow {
                     kind: Anim.Fade
                 }
             }
+        }
+    }
+
+    // Notifications, quietly: the frame's bottom left corner. While there are
+    // some, the corner is rounded much further than the others, one even
+    // curve from the left border to the bottom one, and in the space that
+    // fills there is a light. It ripples for as long as some notifications
+    // have not been looked at. A click there (or on the corner of the border,
+    // when there are none) and the list grows out of the corner. Middle click
+    // switches do not disturb. First screen only.
+    CornerPanel {
+        id: notificationCorner
+
+        readonly property bool here: root.screen === Quickshell.screens[0] && Notifications.serving
+        readonly property bool listOpen: here && Notifications.listOpen
+        readonly property bool calling: Notifications.unread > 0 && !Notifications.doNotDisturb
+        readonly property bool lit: here && Notifications.count > 0 && !listOpen
+        // The corner's radius: the frame's own without notifications, larger
+        // with some, larger still while the light is calling.
+        property real corner: !lit ? Theme.frameRounding : (Notifications.unread > 0 ? 72 : 54)
+        // The filled corner is as deep, along its diagonal, as 0.414 of the
+        // radius. The light sits halfway; a square this size at the corner
+        // lies within the fill and is the button.
+        readonly property real lightAt: corner * 0.146
+        readonly property real button: lit ? corner * 0.29 : 0
+
+        function clicked(button) {
+            if (button === Qt.MiddleButton)
+                Notifications.backend?.setDoNotDisturb(!Notifications.doNotDisturb);
+            else
+                Notifications.toggleList();
+        }
+
+        Behavior on corner {
+            Anim {}
+        }
+
+        anchors.fill: parent
+        edgeX: Theme.frameBorder
+        edgeY: root.height - Theme.frameBorder
+        contentWidth: listOpen ? (notificationList.item?.implicitWidth ?? 363) : 0
+        contentHeight: listOpen ? (notificationList.item?.implicitHeight ?? 120) : 0
+        focus: listOpen
+        Keys.onEscapePressed: Notifications.listOpen = false
+
+        // clicks on the open list stop here
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.AllButtons
+        }
+
+        Loader {
+            id: notificationList
+
+            anchors {
+                left: parent.left
+                bottom: parent.bottom
+            }
+            // stays loaded until it has faded out
+            active: notificationCorner.listOpen || opacity > 0
+            opacity: notificationCorner.listOpen ? 1 : 0
+            sourceComponent: NotificationList {}
+
+            Behavior on opacity {
+                SwapFade {
+                    incoming: notificationCorner.listOpen
+                }
+            }
+        }
+    }
+
+    // the filled corner is the button
+    MouseArea {
+        x: Theme.frameBorder
+        y: root.height - Theme.frameBorder - height
+        width: notificationCorner.button
+        height: notificationCorner.button
+        enabled: !root.modal
+        acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+        onClicked: mouse => notificationCorner.clicked(mouse.button)
+    }
+
+    // Without notifications the corner is like the others: the corner of
+    // the border itself opens the (empty) list.
+    MouseArea {
+        x: 0
+        y: root.height - 45
+        width: Theme.frameBorder
+        height: 45
+        enabled: notificationCorner.here && !root.modal
+        acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+        onClicked: mouse => notificationCorner.clicked(mouse.button)
+    }
+
+    MouseArea {
+        x: 0
+        y: root.height - Theme.frameBorder
+        width: 45
+        height: Theme.frameBorder
+        enabled: notificationCorner.here && !root.modal
+        acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+        onClicked: mouse => notificationCorner.clicked(mouse.button)
+    }
+
+    // The light: drawn by a shader on a canvas larger than the filled corner,
+    // so that its ripples run out over it. It takes no input.
+    ShaderEffect {
+        id: light
+
+        readonly property real size: 132
+        // seconds, running only while it is calling
+        property real time: 0
+        readonly property real energy: notificationCorner.calling ? 1 : 0
+        readonly property color colorA: Theme.accent
+        readonly property color colorB: Theme.desktopColors[1]
+
+        x: notificationCorner.edgeX + notificationCorner.lightAt - size / 2
+        y: notificationCorner.edgeY - notificationCorner.lightAt - size / 2
+        width: size
+        height: size
+        visible: opacity > 0
+        opacity: notificationCorner.lit ? 1 : 0
+        fragmentShader: Qt.resolvedUrl("file://" + Quickshell.shellPath("shaders/orb.frag.qsb"))
+
+        Behavior on opacity {
+            SwapFade {
+                incoming: !notificationCorner.listOpen
+            }
+        }
+
+        NumberAnimation on time {
+            running: light.visible && notificationCorner.calling
+            from: 0
+            to: 3600
+            duration: 3600000
+            loops: Animation.Infinite
         }
     }
 

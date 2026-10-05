@@ -7,6 +7,18 @@ import qs
 // the bar regardless of the Plasma colour scheme.
 Kirigami.Icon {
     property bool colorize: true
+    // Set where this is the icon of one of the bar's modules ("audio", see
+    // symbols.js): the settings window shows the same icon for the module,
+    // whatever it is at the moment, and asks BarItems for it.
+    property string module: ""
+
+    function report() {
+        if (module !== "")
+            BarItems.report(module, String(source));
+    }
+
+    onSourceChanged: report()
+    Component.onCompleted: report()
 
     implicitWidth: Theme.iconSize
     implicitHeight: Theme.iconSize

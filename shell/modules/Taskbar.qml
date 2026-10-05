@@ -8,10 +8,19 @@ import qs.widgets
 // KWin to grant org_kde_plasma_window_management (see
 // packaging/kde-quickshell.desktop). Left click activates (or minimizes the
 // active window), middle click closes.
+//
+// The active window's icon has a rounded square behind it, tinted with the
+// current desktop's colour (the one its dot has in the bar).
 RowLayout {
     id: root
 
     spacing: 3
+
+    // the current desktop's colour, by its position, as in modules/Workspaces.qml
+    readonly property color desktopColor: {
+        const index = Math.max(0, desktopInfo.desktopIds.indexOf(desktopInfo.currentDesktop));
+        return Theme.desktopColors[index % Theme.desktopColors.length];
+    }
 
     TaskManager.VirtualDesktopInfo {
         id: desktopInfo
@@ -66,10 +75,14 @@ RowLayout {
             implicitHeight: 48
             radius: 12
             opacity: model.IsMinimized ? 0.5 : 1
+            // the square: the desktop's colour, faintly, for the active
+            // window; grey under the pointer
             color: {
                 if (model.IsDemandingAttention)
                     return Theme.warning;
-                return mouse.containsMouse || model.IsActive ? Theme.surfaceHover : "transparent";
+                if (model.IsActive)
+                    return Qt.tint(Theme.surface, Qt.alpha(root.desktopColor, 0.38));
+                return mouse.containsMouse ? Theme.surfaceHover : "transparent";
             }
 
             Behavior on color {
@@ -82,19 +95,6 @@ RowLayout {
                 implicitHeight: 36
                 source: task.model.decoration
                 colorize: false
-            }
-
-            // marks the active window
-            Rectangle {
-                anchors {
-                    horizontalCenter: parent.horizontalCenter
-                    bottom: parent.bottom
-                }
-                visible: task.model.IsActive
-                width: 12
-                height: 3
-                radius: 1.5
-                color: Theme.accent
             }
 
             HoverHandler {

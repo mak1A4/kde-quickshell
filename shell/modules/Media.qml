@@ -14,7 +14,8 @@ BarButton {
     readonly property var players: Mpris.players.values
     readonly property MprisPlayer player: players.find(p => p.isPlaying) ?? players[0] ?? null
 
-    visible: player !== null
+    tucked: BarItems.tucked("media")
+    visible: player !== null && implicitHeight > 0
     hintTitle: player?.trackTitle || player?.identity || ""
     hintLines: [player?.trackArtist, player?.trackAlbum, player?.trackTitle ? player?.identity : ""].filter(line => line)
     onClicked: button => {
@@ -28,6 +29,7 @@ BarButton {
 
     Icon {
         Layout.alignment: Qt.AlignHCenter
+        module: "media"
         source: root.player?.isPlaying ? "media-playback-playing-symbolic" : "media-playback-paused-symbolic"
     }
 }

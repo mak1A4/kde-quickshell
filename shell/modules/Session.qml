@@ -8,6 +8,7 @@ import qs.modules.session
 BarButton {
     id: root
 
+    tucked: BarItems.tucked("session")
     active: Popouts.current === "session"
     hintTitle: "Session"
     hintLines: ["Lock, sleep, restart, shut down"]
@@ -24,6 +25,7 @@ BarButton {
 
     Icon {
         Layout.alignment: Qt.AlignHCenter
+        module: "session"
         source: "system-shutdown-symbolic"
     }
 }

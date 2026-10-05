@@ -16,6 +16,7 @@ layout(std140, binding = 0) uniform buf {
     vec2 resolution;     // item size, logical px
     vec4 inner;          // the hole: centre x, centre y, half width, half height
     float innerRadius;
+    float cornerRadius;  // of the hole's bottom left corner alone
     float panelRadius;
     float smoothing;     // fillet radius where a panel meets the border
     vec4 color;
@@ -24,6 +25,7 @@ layout(std140, binding = 0) uniform buf {
     vec4 panel1;
     vec4 panel2;
     vec4 panel3;
+    vec4 panel4;
     // A tooltip bubble: a separate shape in its own colour, not merged with
     // the rest, but drawn here so it shares the shadow.
     vec4 bubble;
@@ -53,12 +55,17 @@ float merge(float d, vec2 p, vec4 panel, float maxRadius, float k) {
 void main() {
     vec2 p = qt_TexCoord0 * resolution;
 
-    // the border is everything outside the hole
-    float d = -sdRoundedBox(p, inner.xy, inner.zw, innerRadius);
+    // The border is everything outside the hole. The hole's bottom left
+    // corner has a radius of its own: grown, it fills the corner with one
+    // even curve, which is where the notification light sits.
+    vec2 fromCentre = p - inner.xy;
+    float holeRadius = (fromCentre.x < 0.0 && fromCentre.y > 0.0) ? cornerRadius : innerRadius;
+    float d = -sdRoundedBox(p, inner.xy, inner.zw, holeRadius);
     d = merge(d, p, panel0, panelRadius, smoothing);
     d = merge(d, p, panel1, panelRadius, smoothing);
     d = merge(d, p, panel2, panelRadius, smoothing);
     d = merge(d, p, panel3, panelRadius, smoothing);
+    d = merge(d, p, panel4, panelRadius, smoothing);
 
     float fw = fwidth(d);
     vec4 result = vec4(color.rgb, 1.0) * color.a * (1.0 - smoothstep(-fw, fw, d));

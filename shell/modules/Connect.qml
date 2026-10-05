@@ -11,6 +11,7 @@ import qs.modules.connect
 BarButton {
     id: root
 
+    tucked: BarItems.tucked("connect")
     readonly property bool anyConnected: deviceModel.count > 0
     // the per-device state objects below, for the panel
     property list<QtObject> states: []
@@ -98,6 +99,7 @@ BarButton {
 
     Icon {
         Layout.alignment: Qt.AlignHCenter
+        module: "connect"
         source: "smartphone-symbolic"
         color: root.anyConnected ? Theme.fg : Theme.fgDim
         opacity: root.anyConnected ? 1 : 0.6

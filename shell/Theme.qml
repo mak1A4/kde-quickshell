@@ -29,6 +29,10 @@ Singleton {
     readonly property int panelRounding: 18
     readonly property int barWidth: 48
     readonly property int barButton: 36
+    // A cell in the bar is that wide and this high, and the cells of the lower
+    // group are this far apart: together the distance from one icon to the next.
+    readonly property int barButtonHeight: 30
+    readonly property int barSpacing: 0
     readonly property int dockHeight: 60
     readonly property int popupWidth: 420
     readonly property int pillHeight: 24
