@@ -8,8 +8,9 @@ import qs.widgets
 // every notification not yet closed, newest
 // first, as the same cards the popups use (they do not expire here). While
 // one is still open towards its application its actions work. Under them,
-// "earlier": what a past run of the shell left in the history on disk (see
-// Notifications.qml), as records without actions. Above
+// "earlier": what is only in the history on disk any more (see
+// Notifications.qml), left by a past run of the shell or taken back by its
+// application, as records without actions. Above
 // it all: do not disturb, clear, and the way to System Settings.
 Item {
     id: root
@@ -69,10 +70,7 @@ Item {
             IconButton {
                 visible: list.count > 0 || root.earlier.length > 0
                 source: "edit-clear-history-symbolic"
-                onClicked: {
-                    Notifications.backend?.clear();
-                    Notifications.clearEarlier();
-                }
+                onClicked: Notifications.clearAll()
             }
 
             IconButton {

@@ -15,7 +15,14 @@ Item {
     required property var screen
 
     property bool shown: false
-    readonly property bool wanted: sensor.hovered || panelHover.hovered
+    // an icon of this dock is being dragged, or its menu is open (Pins)
+    readonly property bool held: {
+        for (let item = Pins.holder; item; item = item.parent)
+            if (item === root)
+                return true;
+        return false;
+    }
+    readonly property bool wanted: sensor.hovered || panelHover.hovered || held
     readonly property bool launcherOpen: Launcher.open && (Launcher.screen === null || Launcher.screen === screen)
     readonly property bool visibleNow: shown || launcherOpen
 

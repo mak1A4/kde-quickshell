@@ -32,34 +32,14 @@ Singleton {
     readonly property var popups: backend?.popups ?? null
     readonly property var history: backend?.history ?? null
     // with what is only in the history on disk, see below
-    readonly property int unread: (backend?.unread ?? 0) + unreadEarlier
+    // How many have arrived since the list was last looked at, critical ones
+    // (they pop up) not counted: the entries of the history that say so.
+    readonly property int unread: entries.filter(entry => entry.unread).length
     readonly property int count: (backend?.count ?? 0) + earlier.length
     readonly property bool doNotDisturb: backend?.inhibited ?? false
 
-    // How many are unread is counted by the service, which is made anew
-    // when the shell reloads its configuration, while the notifications
-    // themselves stay (see notifications/Service.qml). This carries the
-    // count over, so the light in the corner does not go out, or come on
-    // for everything in the list.
-    PersistentProperties {
-        id: kept
-
-        reloadableId: "notifications"
-        property int unread: 0
-
-        onReloaded: {
-            if (root.backend)
-                root.backend.unread = Math.min(unread, root.backend.count);
-        }
-    }
-
     Connections {
         target: root.backend
-
-        function onUnreadChanged() {
-            kept.unread = root.backend.unread;
-            root.save();
-        }
 
         // the list is there, or there again: after a start or a reload
         function onHistoryChanged() {
@@ -75,24 +55,33 @@ Singleton {
     //
     // KDE's engine keeps the notifications in the process, so they end with
     // it: a restart of the shell, a crash, a logout, and whatever had not
-    // been looked at was gone. So everything in the list is also written to a
-    // file as it arrives, and what a past run of the shell left there is
-    // shown under the list ("earlier") until it is closed. Such a
-    // notification is a record: text, time and icon. Its application no
-    // longer knows it, so it has no actions and a click does nothing.
+    // been looked at was gone. And it drops one the moment its application
+    // takes it back, which some do after a few seconds (Teams): the light in
+    // the corner came on and went out again, nothing left to see what for.
+    // So everything in the list is also written to a file as it arrives, and
+    // what is in the file but no longer in the list is shown under it
+    // ("earlier") until the user closes it: what a past run of the shell
+    // left, and what its application has taken back. Such a notification is a
+    // record: text, time and icon. Its application no longer knows it, so it
+    // has no actions and a click does nothing.
     //
     // An entry is what Service.listed() says of a notification, with the
-    // run of the shell it belongs to (`session`) and a `key`. The file holds
-    // all entries, newest first, and how many of them were unread.
+    // run of the shell it belongs to (`session`), a `key`, and whether it
+    // has been seen (`unread`: it arrived while the list was closed, and the
+    // list has not been opened since; what arrives while it is open is
+    // seen). The file holds all entries.
     readonly property int maxEarlier: 200
     // this run of the shell: the same over a reload, another after a restart
     property string session: ""
     property bool journalLoaded: false
     property var entries: []
-    // unread ones among those of past runs
-    property int unreadEarlier: 0
-    // what the engine no longer has: of a past run, or lost by this one
+    // what the engine no longer has: of a past run, taken back by its
+    // application, or lost
     readonly property var earlier: entries.filter(entry => entry.session !== session)
+    // Keys of notifications the user has closed or answered. When one of
+    // these goes from the list it goes for good; any other that goes was
+    // taken back by its application and stays as a record.
+    property var dismissed: ({})
     // what was last written
     property string written: ""
 
@@ -130,10 +119,10 @@ Singleton {
     }
 
     // Brings the entries of this run in line with the list: what is in the
-    // list is in the file. What is in the file but no longer in the list was
-    // closed, by the user or its application, and goes. Unless the list has
-    // just been made (`fresh`, after a reload): then nothing can have been
-    // closed, the engine has lost it, and it is kept as a record.
+    // list is in the file. What is in the file but no longer in the list
+    // stays as a record, unless the user closed it. `fresh`: the list has
+    // just been made, after a start or a reload; what arrives then is not
+    // news.
     function reconcile(fresh) {
         if (!journalLoaded)
             return;
@@ -141,20 +130,44 @@ Singleton {
         // no list just now: nothing is known, nothing changes
         if (listed === null)
             return;
+        const known = {};
+        for (const entry of entries)
+            known[entry.key] = entry;
         const present = {};
         const mine = listed.map(row => {
             const key = session + "/" + row.id;
             present[key] = true;
             return Object.assign({
                 key: key,
-                session: session
+                session: session,
+                // 4: critical, which pops up
+                unread: known[key]?.unread ?? (!fresh && !listOpen && row.urgency !== 4)
             }, row);
         });
-        const lost = fresh ? entries.filter(entry => entry.session === session && !present[entry.key]).map(entry => Object.assign({}, entry, {
-                session: "lost"
-            })) : [];
-        entries = mine.concat(lost, earlier).slice(0, mine.length + maxEarlier);
+        const records = [];
+        for (const entry of entries) {
+            if (entry.session !== session)
+                records.push(entry);
+            else if (!present[entry.key] && !dismissed[entry.key])
+                // taken back, or lost by the engine
+                records.push(Object.assign({}, entry, {
+                    session: "gone"
+                }));
+        }
+        records.sort((a, b) => b.created - a.created);
+        const left = {};
+        for (const key in dismissed)
+            if (present[key])
+                left[key] = true;
+        dismissed = left;
+        entries = mine.concat(records.slice(0, maxEarlier));
         save();
+    }
+
+    // The user closes or answers the notification with this id (as
+    // Service.listed() gives it): when it goes, it goes for good.
+    function dismiss(id) {
+        dismissed[session + "/" + id] = true;
     }
 
     // closes one of the earlier ones
@@ -163,10 +176,15 @@ Singleton {
         save();
     }
 
-    function clearEarlier() {
+    // the clear button: everything, the records with it
+    function clearAll() {
+        for (const entry of entries)
+            if (entry.session === session)
+                dismissed[entry.key] = true;
+        backend?.clear();
         entries = entries.filter(entry => entry.session === session);
-        unreadEarlier = 0;
         save();
+        reconcile(false);
     }
 
     function save() {
@@ -174,8 +192,6 @@ Singleton {
             return;
         const text = JSON.stringify({
             session: session,
-            unreadLive: backend?.unread ?? 0,
-            unreadEarlier: unreadEarlier,
             entries: entries
         });
         if (text === written)
@@ -192,10 +208,6 @@ Singleton {
             stored = JSON.parse(journalFile.text()) ?? {};
         } catch (error) {}
         entries = stored.entries ?? [];
-        // what a past run had not shown is still not seen
-        unreadEarlier = (stored.unreadEarlier ?? 0) + (stored.session === session ? 0 : stored.unreadLive ?? 0);
-        if (earlier.length === 0)
-            unreadEarlier = 0;
         journalLoaded = true;
         reconcile(true);
         save();
@@ -204,10 +216,12 @@ Singleton {
     // the list is showing
     property bool listOpen: false
 
-    // looked at, the earlier ones are seen too
+    // looked at, everything is seen
     onListOpenChanged: {
-        if (listOpen && unreadEarlier > 0) {
-            unreadEarlier = 0;
+        if (listOpen && entries.some(entry => entry.unread)) {
+            entries = entries.map(entry => entry.unread ? Object.assign({}, entry, {
+                    unread: false
+                }) : entry);
             save();
         }
     }
@@ -223,13 +237,6 @@ Singleton {
         listOpen = true;
     }
 
-    // while it is open, what is in it and what arrives counts as seen
-    Binding {
-        target: root.backend
-        property: "listOpen"
-        value: root.listOpen
-        when: root.backend !== null
-    }
 
     IpcHandler {
         target: "notifications"
@@ -248,6 +255,11 @@ Singleton {
 
         function count(): int {
             return root.count;
+        }
+
+        // as the list's clear button
+        function clear(): void {
+            root.clearAll();
         }
     }
 

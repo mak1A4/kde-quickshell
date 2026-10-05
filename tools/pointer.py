@@ -10,6 +10,7 @@ and put the cursor back afterwards.
     tools/pointer.py 1920x1080 move:1700,40          to a position
     tools/pointer.py 1920x1080 move:1700,40 click    then a left click
     tools/pointer.py 1920x1080 move:1700,40 middle   a middle click
+    tools/pointer.py 1920x1080 move:1700,40 right    a right click
     tools/pointer.py 1920x1080 drag:1700,40:1900,40:0.4   press, move there in 0.4 s, release
     tools/pointer.py 1920x1080 sleep:0.5             a pause between steps
 
@@ -67,8 +68,8 @@ def main(arguments):
                 # already has produces no event
                 move(x - 1, y)
                 move(x, y)
-            elif kind in ("click", "middle"):
-                code = ecodes.BTN_LEFT if kind == "click" else ecodes.BTN_MIDDLE
+            elif kind in ("click", "middle", "right"):
+                code = {"click": ecodes.BTN_LEFT, "middle": ecodes.BTN_MIDDLE, "right": ecodes.BTN_RIGHT}[kind]
                 button(code, True)
                 button(code, False)
             elif kind == "drag":

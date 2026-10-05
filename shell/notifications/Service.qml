@@ -36,18 +36,9 @@ Item {
     // how many are in the list; kept by sync(), the model's own `count` was
     // seen not to announce the first row
     property int count: 0
-    // How many have arrived since the list was last looked at, critical ones
-    // (they pop up) not counted. Kept here: KDE's own count of unread ones
-    // only covers expired notifications, and these are not expired, see
-    // `quiet` below.
-    property int unread: 0
-    // the list is open: what arrives is seen
-    property bool listOpen: false
-    // the models are taking up what the engine already holds (see the
-    // models): that is not what arrives
-    property bool restoring: false
-
-    onListOpenChanged: unread = 0
+    // Which of them are unread is not kept here but with the history
+    // (../Notifications.qml): KDE's own count of unread ones only covers
+    // expired notifications, and it goes with the engine.
     onHistoryChanged: sync()
 
     // something in the list arrived, went or was changed
@@ -83,7 +74,6 @@ Item {
 
     function sync() {
         count = history ? history.rowCount() : 0;
-        unread = Math.min(unread, count);
     }
 
     // Closes everything in the list except critical notifications still
@@ -200,12 +190,10 @@ Item {
             // notifications were all still there, 17 of them after as many
             // reloads, and the list empty.
             Component.onCompleted: {
-                root.restoring = true;
                 for (const model of [popups, quiet, history]) {
                     model.showDismissed = !model.showDismissed;
                     model.showDismissed = !model.showDismissed;
                 }
-                root.restoring = false;
                 root.sync();
             }
 
@@ -281,19 +269,9 @@ Item {
                 sortOrder: Qt.DescendingOrder
                 groupMode: NotificationManager.Notifications.GroupDisabled
                 urgencies: NotificationManager.Notifications.CriticalUrgency | NotificationManager.Notifications.NormalUrgency | NotificationManager.Notifications.LowUrgency
-                onRowsInserted: (parent, first, last) => {
-                    root.touched();
-                    if (root.listOpen || root.restoring) {
-                        root.sync();
-                        return;
-                    }
-                    for (let row = first; row <= last; row++) {
-                        const index = history.index(row, 0);
-                        // not the ones that pop up, nor the ones about to be dropped
-                        if (history.data(index, NotificationManager.Notifications.UrgencyRole) !== NotificationManager.Notifications.CriticalUrgency && !history.data(index, NotificationManager.Notifications.TransientRole))
-                            root.unread++;
-                    }
+                onRowsInserted: {
                     root.sync();
+                    root.touched();
                 }
                 onRowsRemoved: {
                     root.sync();

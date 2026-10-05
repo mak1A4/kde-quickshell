@@ -92,6 +92,20 @@ Rectangle {
         return notifications.index(index, 0);
     }
 
+    // Tells the history that what happens to this notification next is the
+    // user's doing (Notifications.dismiss()): one that goes from the list
+    // otherwise was taken back by its application and is kept as a record.
+    // A record itself has no id and nothing to tell.
+    function mine() {
+        if (model.notificationId !== undefined)
+            Notifications.dismiss(String(model.notificationId));
+    }
+
+    function close() {
+        mine();
+        notifications.close(modelIndex());
+    }
+
     // ---- dragging it away ---------------------------------------------------
 
     // how far it has been dragged; past `swipeAway` of its width it closes
@@ -122,7 +136,7 @@ Rectangle {
         id: gone
 
         interval: Theme.fadeDuration
-        onTriggered: root.notifications.close(root.modelIndex())
+        onTriggered: root.close()
     }
 
     DragHandler {
@@ -165,11 +179,13 @@ Rectangle {
         acceptedButtons: Qt.LeftButton | Qt.MiddleButton
         onClicked: mouse => {
             if (mouse.button === Qt.MiddleButton)
-                root.notifications.close(root.modelIndex());
-            else if (root.model.hasDefaultAction && root.answerable)
+                root.close();
+            else if (root.model.hasDefaultAction && root.answerable) {
+                root.mine();
                 root.notifications.invokeDefaultAction(root.modelIndex());
-            else if (root.expandable)
+            } else if (root.expandable) {
                 root.expanded = !root.expanded;
+            }
         }
     }
 
@@ -320,7 +336,7 @@ Rectangle {
                     implicitHeight: 21
                     visible: hover.hovered
                     source: "window-close-symbolic"
-                    onClicked: root.notifications.close(root.modelIndex())
+                    onClicked: root.close()
                 }
 
                 IconButton {
@@ -387,7 +403,10 @@ Rectangle {
 
                         raised: true
                         text: modelData
-                        onClicked: root.notifications.invokeAction(root.modelIndex(), root.model.actionNames[index])
+                        onClicked: {
+                            root.mine();
+                            root.notifications.invokeAction(root.modelIndex(), root.model.actionNames[index]);
+                        }
                     }
                 }
 

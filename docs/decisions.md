@@ -84,6 +84,8 @@ timing carried over.
   colour use `[0.34, 0.8, 0.34, 1]` over 200 ms. One place: `Theme` + `widgets/Anim.qml`.
 - **Shadow:** the whole shape casts one soft shadow (`MultiEffect`, blur 15) on the
   windows below. Caelestia uses 0.7 opacity; here 0.5 (`Theme.shadowOpacity`).
+- **No tooltip on the dock's application icons** since 2026-10-05 (asked for: "want it
+  more minimal"). The bubble described next is now only the launcher button's.
 - **Dock tooltip:** a plain bubble 9 px above the hovered icon, in its own colour
   (`Theme.tooltipBg` / `tooltipFg`, accent by default) so it reads as separate from the
   dock. The shader draws it as an independent shape (own colour and opacity, not merged),
@@ -113,7 +115,8 @@ timing carried over.
   the current desktop's colour (`Theme.desktopColors`, as its dot in the bar), so the
   dock says which window and which desktop. Tried and dropped on 2026-10-05: a small
   accent bar under the icon (with a grey square), and the icon lifted with a pool of
-  accent-coloured light under it and no square.
+  accent-coloured light under it and no square. Also tried that day and taken back: the
+  active window's cell (square, icon and dot) standing 3 px above the row.
 - **Hints** wait `Theme.hintDelay` (400 ms; Noctalia uses 500) before first appearing,
   then switch immediately between items.
 
@@ -271,8 +274,9 @@ again, as if nothing had been installed.
     (found by trying: 17 notifications were there after as many reloads, and the list
     empty; setting `showDismissed` or `urgencies` brought them, the sort order did
     not). So each model has `showDismissed` set once when made.
-  - The count of unread ones is the service's own and goes with it; a
-    `PersistentProperties` in `Notifications.qml` carries it over.
+  - The count of unread ones was the service's own and went with it; a
+    `PersistentProperties` carried it over, until the history took over what is unread
+    (below).
   A notification that arrives during a reload is kept too, the engine never being
   without a model. Tested: count and unread over six reloads in a row, the first reload
   after a start of the shell, and reading the list before a reload.
@@ -280,8 +284,8 @@ again, as if nothing had been installed.
   above: "a proper notification history"). The engine and its notifications end with
   the process: a restart of the shell, a crash, a logout. So everything in the list is
   also written to `notifications.json` in the shell's state directory, within 100 ms of
-  arriving, and what a past run left there is shown under the list as "Earlier" until
-  it is closed or the list is cleared. Plasma has nothing like it: its history is gone
+  arriving, and what is in the file but no longer in the list is shown under it as
+  "Earlier" until it is closed or the list is cleared. Plasma has nothing like it: its history is gone
   with plasmashell.
   - An earlier one is a record: text, time, icons, urgency. Its application no longer
     knows it, so it has no actions and a click only expands it. A notification's own
@@ -295,13 +299,26 @@ again, as if nothing had been installed.
   - If the list comes back from a reload without something the file has for this run,
     the engine lost it (as it did before the fix above), and the entry is kept as a
     record instead of being taken for closed.
-  - How many were unread is in the file too, so the light is on again after a restart.
+  - **What its application takes back stays as a record.** Reported: the light came on
+    for a Teams message and went out after a few seconds. An application can close its
+    own notification, the engine then drops it, and the list and the light had nothing
+    left (shown with `notify-send -p` and `CloseNotification`). Now a notification that
+    goes from the list is kept as a record unless the user closed it, answered it or
+    cleared the list (`Notifications.dismiss()`, called by the card). The price: one
+    that the application takes back because it was read elsewhere stays too, until it
+    is closed here.
+  - Whether an entry is unread is in the entry (it arrived while the list was closed,
+    and the list has not been opened since); the light follows these. The service no
+    longer counts, and nothing needs carrying over a reload.
   - At most 200 earlier ones are kept. The file holds the text of notifications
     (messages, mail subjects) in the clear, readable like the rest of the home
     directory.
   - Tested: two notifications over two reloads, then a restart of the shell (they come
     back as "Earlier", unread), a third after it, more reloads; the list on screen.
-    Not tested: closing an earlier one, the clear button, a crash.
+    Later: a notification taken back by its sender staying as an unread record, the
+    list opened (all read), another taken back, two reloads, and clearing over IPC
+    (`qs ipc call notifications clear`, the clear button's function). Not tested:
+    closing a single card (live or earlier) by a click, a crash.
 - **Actions only while they work.** KDE's engine marks a notification expired by itself
   about three minutes after it arrived if nothing else did (one minute after its
   timeout, the default counted as two) and tells its application that it is closed; the
@@ -601,6 +618,73 @@ restarted at once; the key tables; opening the window with Enter on "Shell setti
 and, in the first version of the window, recording Meta+Space, which showed the conflict
 with KRunner. Not tested: a click on the button in the window (only its function,
 headless), the message's close button, and the message's current wording on screen.
+
+## Dock: pinned applications, and icons dragged into place
+
+Asked for: reorder the dock's icons by drag and drop, and pin icons so that they stay
+when the application is closed. Both are KDE's task list's own (`TasksModel`), as in
+Plasma's task manager; the shell adds the gestures and keeps the list.
+
+- **Pinned applications are KDE's "launchers".** `launcherList` on the dock's
+  `TasksModel`, with `separateLaunchers: false` and `launchInPlace: true`: a pinned
+  application is in the row without a window too, a click starts it, and its window
+  takes the launcher's place. The list is kept in `~/.config/kde-quickshell/dock.json`
+  (`shell/Pins.qml`, addresses as KDE writes them, `applications:org.kde.dolphin.desktop`)
+  and read again when the file changes.
+- **Pinning is in a menu**, on a right click: "Pin to the Dock" or "Unpin from the
+  Dock", and for a window "New Window" and "Close". `widgets/ActionMenu.qml`, a popup
+  above the icon in the look of the tray's menus, for a plain list of actions (the
+  tray's `MenuPopup` is built around an application's menu). Considered: right click
+  pins at once, with the hint saying so. One stray click would have removed an icon.
+- **A pinned application that is not running is dimmed** (half opacity); a window has
+  its icon as it is. First a window had a dot under its icon and the pinned one none;
+  the dot was taken out again the same day in favour of this. A minimized window used
+  to be dimmed and no longer is: it would look like an application that is not running.
+- **The order of the icons is the shell's own**, by application: `order` in the same
+  file, pinned or not, running or not. The task list's rows go through a
+  `DelegateModel` and are put in that order whenever rows come or go
+  (`Taskbar.arrange()`); an application not in it yet goes to the end. So an icon is
+  where it was put, also after its application was closed and started again and after
+  a restart of the shell. The last 30 applications that are neither here nor pinned are
+  remembered, no more.
+  - First the order was the task list's (`SortManual`, `launchInPlace`, `move()` and
+    `syncLaunchers()`, as Plasma's task manager does it). Reported the same day: a
+    pinned application was closed and its icon went to another place. The task list has
+    two rows for a pinned application, the launcher (hidden while a window is there)
+    and the window, each with its own place in its manual order. They are only together
+    if the window opened after the launcher was there. Pin an application that is
+    running, or reload the shell while it runs, and the window is at one place and the
+    launcher at another, where the icon turns up when the window closes. Reproduced
+    with the calculator: pinned while running at the end of the row, closed, and its
+    icon was in the middle. Setting the launcher list also re-sorted the whole row.
+  - With the order by application the launcher and the window have one key (the
+    launcher's address) and so one place.
+- **Dragging:** an icon follows the pointer along the row, the others move aside to
+  show where it would go (a transform on each, nothing changes meanwhile), and the
+  order is changed once when it is let go (`Taskbar.dropped()`): the application goes
+  before or after the one it was dropped on.
+- **The dock stays out** while an icon is dragged or a menu is open, though the pointer
+  has left it: the taskbar names itself in `Pins.holder`, and the dock that contains it
+  counts that as wanted.
+- **The file is not written before it has been read** (`Pins.ready`). Arranging the
+  icons writes the order; at the start that came before the pins had been read, and
+  wrote an empty list of pins over the user's four.
+- Tested with the virtual pointer: the dots; an icon dragged two places to the left; the
+  menu on a right click; "Pin to the Dock" writing the file; a pinned application that
+  was not running (through the file) shown in front without a dot; the file removed and
+  the pins gone. Headless, the task list has no rows, so the moves could only be tried
+  on screen. Not tested: starting a pinned application by a click, unpinning from the
+  menu, the pinned order after dragging and a restart, two windows of one application.
+- Tested after the change to the shell's own order: the calculator pinned while running
+  and closed again stays where it was, dimmed; `dropped()` to the left and to the
+  right through a test hook over IPC, the file after it and after a reload. Not on
+  screen with the new order: a drag.
+- A drag meant for the dock went into the user's Teams window: the dock had not come up
+  (the user was using the pointer). No more pointer tests while the user is working;
+  logic goes through a temporary IPC hook instead.
+- A click meant for the menu went into the user's window: the menu had closed while
+  screenshots were taken to make sure it was open. A popup that grabs the focus does
+  not outlast other programs; open it and click in one run of `pointer.py`.
 
 ## Testing the pointer: a virtual pointing device
 
