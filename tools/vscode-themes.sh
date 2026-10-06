@@ -2,8 +2,9 @@
 # Installs the VS Code extensions that hold the colour themes of the shell's
 # themes (shell/themes/*.json, "apps": { "vscode": ... }), so that VS Code has
 # each when the shell names it (shell/apply.sh). Solarized and the default
-# themes, for Breeze, come with VS Code. Run once, and again after adding a
-# theme that needs another extension.
+# themes, for Breeze, come with VS Code. For `code` the shell does this itself
+# at its start (shell/setup.sh, which has the same list); this is for another
+# build of VS Code.
 #
 #   tools/vscode-themes.sh [code|codium|...]
 

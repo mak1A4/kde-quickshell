@@ -10,6 +10,7 @@ ShellRoot {
     readonly property var loginScreen: LoginScreen
     readonly property var themeExport: ThemeExport
     readonly property var looks: Looks
+    readonly property var setup: Setup
 
     Variants {
         model: Quickshell.screens

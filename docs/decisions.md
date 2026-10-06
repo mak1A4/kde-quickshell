@@ -1023,8 +1023,8 @@ read again.
   (`apps.vscode`), written into `settings.json` as `workbench.colorTheme` and as both the
   preferred dark and light one: with "follow the system" on, VS Code takes one of those
   and not the first. It reads its settings again by itself. The extensions that hold the
-  colour themes are installed by `tools/vscode-themes.sh`, once, not at a change of
-  theme: an extension is a program.
+  colour themes are installed by `setup.sh` at the shell's start, once, not at a change
+  of theme: an extension is a program.
 - **Browsers, Omarchy's way:** Chromium and what is made from it (Helium reads
   Chromium's directory) take `BrowserThemeColor`, the theme's `bg`, from machine policy
   (`/etc/chromium/policies/managed/kde-quickshell.json`), and a running browser takes it
@@ -1109,9 +1109,11 @@ switch user, as far as the session allows them.
   directory with the lock screen exchanged would go stale at every Plasma update. So:
   the package holds nothing but `contents/lockscreen`, and the variable is set for KWin's
   service alone (`~/.config/systemd/user/plasma-kwin_wayland.service.d/kde-quickshell-lock.conf`),
-  because KWin starts the locker and plasmashell is another service. `tools/lockscreen.sh`
-  does both, `--undo` removes both. KWin has its environment from its start, so it counts
-  from the next login; a changed lock screen (the tool again) from the next lock.
+  because KWin starts the locker and plasmashell is another service. The shell does
+  both at its start (`setup.sh`, see "Setup"), and takes both away again when
+  `setup.json` says `"lockscreen": false`. KWin has its environment from its start, so
+  it counts from the next login; a changed lock screen is copied at the shell's next
+  start and shown at the next lock.
 - **If it fails.** QML that does not load: the locker shows its built-in screen. QML
   that loads and cannot be used: `loginctl unlock-sessions` from a console.
 - **What is not there** of Plasma's lock screen: media controls, the on-screen keyboard,
@@ -1128,10 +1130,66 @@ locker's test mode: idle; the panels out (by changed copies of the QML: there is
 keyboard in that compositor); a password in the field; the look after a wrong password;
 that the field has the keyboard focus and the window is active; the theme's colours
 from `Look.qml`; the package found through `PLASMA_DEFAULT_SHELL` with the user's own
-`plasmashellrc`; `tools/lockscreen.sh` and `--undo` against scratch directories. Not
+`plasmashellrc`; installing and removing it against scratch directories. Not
 tested: anything in the real locker (it has the environment only after a login): typing,
 unlocking, a wrong password as PAM reports it, sleep and switch user, the motion of the
 panels (only stills were taken), two monitors, a user picture (this user has none).
+
+## Setup: looked at each time the shell starts
+
+The shell is meant to be all there is to install: start it once (`qs -p shell`) and it
+puts in place what it needs outside itself, and at every later start looks whether that
+is still so. `setup.sh` does the looking and the putting, `Setup.qml` runs it eight
+seconds after the start (2026-10-06).
+
+- **One line for each thing**, with one of four words. `ok`. `fixed`: was missing or
+  stale and has been put right. `note`: as it is for a reason, or not the shell's to
+  change. `problem`: wrong, and nothing this can put right.
+- **What it puts in place:** the desktop entry that gives the shell the window list
+  (`packaging/kde-quickshell.desktop`, and `kbuildsycoca6`); the autostart entry, once;
+  the lock screen's package and the drop-in that names it for KWin (what
+  `tools/lockscreen.sh` did by hand; that tool is gone); VS Code's extensions for the
+  themes, asked for once and again when the list changes, since asking VS Code takes a
+  second or two.
+- **What it only says:** programs that are not installed; a package of ours in
+  `~/.local/share/plasma` whose files are links (Plasma refuses those: the black
+  desktop after a reboot, when a dotfiles manager had linked them); `ShellPackage` named
+  in `plasmashellrc` (the locker then takes that one's interface); the login screen
+  behind the session; a keeper that is not running; KDE's colour scheme not the
+  theme's; a terminal, tmux or Neovim that is installed and whose configuration does
+  not name the theme's file; no backgrounds.
+- **Why the last ones are only said.** Those configurations are the user's, here links
+  into a dotfiles repository, two of them programs (Lua). A line appended to them by a
+  shell at its start is a change to someone's repository that they did not make. The
+  note says which line it is.
+- **Root's part stays where it was.** The login screen and the browsers' helper are
+  `login.sh`'s, asked for with the password by `LoginScreen.qml`; `setup.sh` reports
+  how that stands and is looked at again when it has changed. `login.sh` no longer
+  takes Plasma Login Manager for granted: without it (`login.sh greeter` says `no`)
+  only the helper and its polkit rule are installed, and `check` asks for no more.
+- **Saying it.** Nothing when all is well. A notification for what was put right; one
+  for what is wrong, when it is new (`setup-told` in the state directory holds what
+  was said, so a reload a minute later is quiet). "Check the shell's setup" among the
+  ">" actions looks again and says everything; each thing that is not `ok` is an action
+  of its own there ("Setup: ..."), with what there is to say as its second line.
+  `qs ipc call setup report` gives all lines, `setup check` looks again.
+- **Switching parts off:** `~/.config/kde-quickshell/setup.json`, `{ "lockscreen":
+  false, "autostart": false, "vscode": false }`, each on unless it says false.
+  `"lockscreen": false` also removes what was installed.
+- **A trap in QML's JavaScript:** `const [state, id, title, detail] = line.split("\t")`
+  in a loop left `title` and `detail` with the values of the line before when a line
+  had fewer parts, so the empty last line became a seventeenth thing. Taken apart by
+  index instead.
+
+Tested: against empty scratch directories for configuration, data and state (first run
+makes the entries and the lock screen, second run changes nothing, a removed autostart
+entry stays removed, one that starts something else is pointed here, `"lockscreen":
+false` removes and then says so); `login.sh` with and without a greeter against a
+scratch root; on this machine: all sixteen `ok`, the desktop entry taken away and put
+back by `setup check` with its notification, a restart of the shell with the report
+there afterwards and no question for the password. Not tested: a machine that really
+has nothing of it yet, a machine without Plasma Login Manager, a failing
+`code --install-extension`.
 
 ## Started at login by a KDE autostart entry
 
@@ -1141,6 +1199,12 @@ panels (only stills were taken), two monitors, a user picture (this user has non
 under Autostart, where it can be switched off. Not in this repository: the path in it is
 this machine's, and it has to be the exact path `qs ipc -p` is called with. No `-d`: the
 unit should hold the process. The unit does not restart a shell that has ended.
+
+The shell makes the entry itself the first time it runs (`setup.sh`, see "Setup"), with
+the path it was started by. Once: an entry that is gone afterwards was taken away by
+the user and is not put back (`~/.local/state/kde-quickshell/autostart-made` is the
+note of that), and one switched off in System Settings stays off. An entry that starts
+something other than this shell is pointed at it.
 
 Tested: the generated unit started by hand, the shell up and answering IPC. Not tested:
 a login.

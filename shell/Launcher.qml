@@ -161,7 +161,8 @@ Singleton {
 
     // ---- actions (">") ---------------------------------------------------
 
-    // The session actions, plus the shell's settings, reloading it, one per
+    // The session actions, plus the shell's settings, reloading it, its
+    // setup (and each thing of it that is not simply in place), one per
     // theme and one per background of the theme in use. From here, anything that ends the session goes through KDE's
     // own confirmation screen: one Enter on a typed query should not be
     // enough to shut the machine down.
@@ -196,12 +197,23 @@ Singleton {
             browsers: Themes.browsers === "system" ? "policy" : "system"
         },
         {
+            title: "Check the shell's setup",
+            subtitle: Setup.summary,
+            icon: "checkmark-symbolic",
+            setup: true
+        },
+        {
             title: "Reload shell",
             subtitle: "Reload this shell's configuration",
             icon: "view-refresh-symbolic",
             reload: true
         }
-    ]).concat(Themes.names.map(name => ({
+    ]).concat(Setup.open.map(item => ({
+                title: "Setup: " + item.title,
+                subtitle: item.detail,
+                icon: item.state === "problem" ? "dialog-warning-symbolic" : (item.state === "fixed" ? "checkmark-symbolic" : "dialog-information-symbolic"),
+                setup: true
+            }))).concat(Themes.names.map(name => ({
                 title: "Theme: " + Themes.title(name),
                 subtitle: name === Themes.chosen ? "In use" : "",
                 icon: "palette-symbolic",
@@ -322,6 +334,8 @@ Singleton {
             Themes.setBrowsers(action.browsers);
         else if (action.login)
             LoginScreen.check(true);
+        else if (action.setup)
+            Setup.check(true);
         else
             SessionActions.runWithPrompt(action.session);
     }

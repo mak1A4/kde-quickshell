@@ -9,6 +9,7 @@
 # two differ is root asked for (LoginScreen.qml, through pkexec).
 #
 #   login.sh check <config dir> [force]   "ok", "declined" or "needed <state>"
+#   login.sh greeter                      "yes" if there is such a login screen
 #   login.sh declined <state>             not to be asked for this state again
 #   login.sh apply <config dir> <state>   as root: does it
 #   login.sh undo                         as root: takes it all away
@@ -30,6 +31,9 @@
 #     session run it without the password: it writes the theme's colour into
 #     the browsers' policy at each change of theme, and nothing else;
 #   - notes the state.
+# Where there is no Plasma Login Manager (SDDM, or none at all), only the last
+# three are done, and `check` asks for no more: the browsers' colour needs
+# them all the same.
 
 set -e
 
@@ -50,6 +54,7 @@ setting="$sys/etc/plasmalogin.conf.d/kde-quickshell.conf"
 policy="$sys/usr/share/polkit-1/actions/$action.policy"
 colourer="$sys/usr/local/libexec/kde-quickshell-browser-color"
 applied="$shared/applied"
+greeter=plasmalogin
 synced="kxkbrc kdeglobals plasmarc kcminputrc kwinoutputconfig.json fontconfig/fonts.conf"
 
 # What would be applied, as one word. Not the files as they are: several of
@@ -79,15 +84,29 @@ state() {
     } | sha256sum | cut -c1-16
 }
 
+# Is the login screen this is about on this machine? (Trying it out, with a
+# directory for the system: yes, unless that is said otherwise.)
+there() {
+    if [ -n "$sys" ]; then
+        [ -z "${LOGIN_TEST_ABSENT:-}" ]
+    else
+        getent passwd "$greeter" > /dev/null 2>&1
+    fi
+}
+
 case "$1" in
+greeter)
+    there && echo yes || echo no
+    ;;
+
 check)
     config=$2
     wanted=$(state "$config")
     remembered="${XDG_STATE_HOME:-$HOME/.local/state}/kde-quickshell/login-declined"
     if [ "$3" != force ] && [ "$(cat "$remembered" 2> /dev/null)" = "$wanted" ]; then
         echo declined
-    elif [ "$(cat "$applied" 2> /dev/null)" = "$wanted" ] && [ -w "$shared/background" ] && [ -e "$setting" ] &&
-        diff -rq "$source" "$wallpaper" > /dev/null 2>&1 && cmp -s "$(dirname "$self")/browser-color.sh" "$colourer"; then
+    elif [ "$(cat "$applied" 2> /dev/null)" = "$wanted" ] && cmp -s "$(dirname "$self")/browser-color.sh" "$colourer" &&
+        { ! there || { [ -w "$shared/background" ] && [ -e "$setting" ] && diff -rq "$source" "$wallpaper" > /dev/null 2>&1; }; }; then
         echo ok
     else
         echo "needed $wanted"
@@ -111,12 +130,10 @@ apply)
         # as root, for the user who asked: pkexec and sudo both say who
         uid=${PKEXEC_UID:-${SUDO_UID:?run this through pkexec or sudo}}
         user=$(id -nu "$uid")
-        greeter=plasmalogin
         home=$(getent passwd "$greeter" | cut -d: -f6)
         # the user's files are read as the user, the greeter's written as the greeter
         as_user() { runuser -u "$user" -- "$@"; }
         as_greeter() { runuser -u "$greeter" -- "$@"; }
-        [ -n "$home" ] || { echo "login.sh: no user $greeter, is Plasma Login Manager installed?" >&2; exit 1; }
     elif [ -n "$sys" ]; then
         user=$(id -nu)
         home="$sys/var/lib/plasmalogin"
@@ -128,35 +145,43 @@ apply)
     fi
     as_user test -d "$config" || { echo "login.sh: $config is no directory of $user's" >&2; exit 2; }
 
-    rm -rf "$wallpaper"
-    mkdir -p "$(dirname "$wallpaper")"
-    cp -r "$source" "$wallpaper"
-    chmod -R a+rX "$wallpaper"
-
     install -d -m 755 "$shared"
-    if [ -z "$sys" ]; then
-        install -d -m 755 -o "$user" "$shared/background"
-    else
-        install -d -m 755 "$shared/background"
-    fi
+    if there; then
+        rm -rf "$wallpaper"
+        mkdir -p "$(dirname "$wallpaper")"
+        cp -r "$source" "$wallpaper"
+        chmod -R a+rX "$wallpaper"
 
-    install -d -m 755 "$(dirname "$setting")"
-    printf '[Greeter]\nWallpaperPluginId=%s\n' "$plugin" > "$setting"
-
-    # the greeter keeps colours in a cache it only fills when it has none
-    as_greeter rm -rf "$home/.cache"
-    as_greeter mkdir -p "$home/.config/fontconfig"
-    for file in $synced; do
-        if as_user test -r "$config/$file"; then
-            as_user cat "$config/$file" | as_greeter tee "$home/.config/$file" > /dev/null
+        if [ -z "$sys" ]; then
+            install -d -m 755 -o "$user" "$shared/background"
         else
-            as_greeter rm -f "$home/.config/$file"
+            install -d -m 755 "$shared/background"
         fi
-    done
+
+        install -d -m 755 "$(dirname "$setting")"
+        printf '[Greeter]\nWallpaperPluginId=%s\n' "$plugin" > "$setting"
+
+        # the greeter keeps colours in a cache it only fills when it has none
+        as_greeter rm -rf "$home/.cache"
+        as_greeter mkdir -p "$home/.config/fontconfig"
+        for file in $synced; do
+            if as_user test -r "$config/$file"; then
+                as_user cat "$config/$file" | as_greeter tee "$home/.config/$file" > /dev/null
+            else
+                as_greeter rm -f "$home/.config/$file"
+            fi
+        done
+        chmod 644 "$setting"
+    fi
 
     install -d -m 755 "$(dirname "$colourer")"
     install -m 755 "$(dirname "$self")/browser-color.sh" "$colourer"
 
+    if there; then
+        message="The login screen is behind your session. Authenticate to give it your display scaling, keyboard layout, fonts, colours and the background of the shell's theme."
+    else
+        message="Authenticate to install the helper that gives the browsers the colour of the shell's theme."
+    fi
     install -d -m 755 "$(dirname "$policy")"
     cat > "$policy" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -165,7 +190,7 @@ apply)
 <policyconfig>
   <action id="$action">
     <description>Bring the login screen in step with your session</description>
-    <message>The login screen is behind your session. Authenticate to give it your display scaling, keyboard layout, fonts, colours and the background of the shell's theme.</message>
+    <message>$message</message>
     <icon_name>preferences-system-login</icon_name>
     <defaults>
       <allow_any>auth_admin</allow_any>
@@ -189,7 +214,7 @@ apply)
 EOF
 
     echo "$wanted" > "$applied"
-    chmod 644 "$applied" "$setting" "$policy"
+    chmod 644 "$applied" "$policy"
     ;;
 
 undo)

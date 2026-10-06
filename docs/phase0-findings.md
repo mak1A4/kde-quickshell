@@ -115,6 +115,9 @@ kbuildsycoca6
 qs -p shell
 ```
 
+(Since 2026-10-06 the shell installs the entry itself at its start, `shell/setup.sh`;
+`qs -p shell` is enough, and a second start has the window list.)
+
 ## Open questions (resolved 2026-10-03)
 
 1. Desktops backend: `VirtualDesktopInfo` for state, D-Bus only for switching.

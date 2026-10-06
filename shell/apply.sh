@@ -22,7 +22,7 @@
 #   btop          ~/.config/btop/themes/kde-quickshell.theme: the theme btop
 #                 ships of the same name where it has one, else a template
 #   VS Code       the theme's own colour theme, by name, in settings.json;
-#                 its extension has to be installed (tools/vscode-themes.sh)
+#                 its extension has to be installed (setup.sh does)
 #   browsers      Chromium and the ones made from it take the theme's colour
 #                 from machine policy, written by a helper of root's that
 #                 login.sh installs (browser-color.sh)
