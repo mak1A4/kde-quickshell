@@ -136,39 +136,6 @@ Item {
         }
     }
 
-    component KeyHint: RowLayout {
-        id: hint
-
-        property string key
-        property string text
-
-        spacing: Theme.spacing
-        visible: text !== ""
-
-        Rectangle {
-            implicitWidth: Math.max(18, keyLabel.implicitWidth + 9)
-            implicitHeight: 18
-            radius: 4.5
-            color: Theme.surface
-
-            Label {
-                id: keyLabel
-
-                anchors.centerIn: parent
-                color: Theme.fgDim
-                font.pixelSize: Theme.fontSizeSmall
-                text: hint.key
-            }
-        }
-
-        Label {
-            Layout.maximumWidth: 210
-            color: Theme.fgDim
-            font.pixelSize: 11
-            text: hint.text
-        }
-    }
-
     Column {
         id: column
 

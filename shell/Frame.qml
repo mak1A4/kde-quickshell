@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Effects
 import qs.notifications
 import qs.palette
+import qs.picker
 import qs.widgets
 
 // One transparent surface over the whole screen. It draws the border, the bar
@@ -247,8 +248,8 @@ PanelWindow {
         centreX: (Theme.frameBorder + root.innerRight) / 2
         open: showing
         // fallbacks for the instant before the loader has the content
-        contentWidth: paletteLoader.item?.implicitWidth ?? 660
-        contentHeight: paletteLoader.item?.implicitHeight ?? 69
+        contentWidth: paletteLoader.item?.implicitWidth ?? (CommandPalette.themesMode ? 1284 : 660)
+        contentHeight: paletteLoader.item?.implicitHeight ?? (CommandPalette.themesMode ? 273 : 69)
 
         // clicks on the palette must not reach the dismiss area underneath
         MouseArea {
@@ -262,7 +263,19 @@ PanelWindow {
 
             active: commandPalette.showing || opacity > 0
             opacity: commandPalette.showing ? 1 : 0
-            sourceComponent: PalettePanel {}
+            sourceComponent: CommandPalette.themesMode ? themePicker : palettePanel
+
+            Component {
+                id: palettePanel
+
+                PalettePanel {}
+            }
+
+            Component {
+                id: themePicker
+
+                ThemePicker {}
+            }
 
             Behavior on opacity {
                 Anim {

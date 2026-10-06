@@ -18,7 +18,8 @@ import QtQuick
 //
 // It has a second mode, the clipboard history: Klipper's entries, text and
 // images, filtered by what is typed; Enter puts one back on the clipboard.
-// `call palette clipboard`, or its own shortcut (see Hotkeys.qml).
+// `call palette clipboard`, or its own shortcut (see Hotkeys.qml). And a
+// third, the theme switcher: `call palette themes`.
 Singleton {
     id: root
 
@@ -26,9 +27,11 @@ Singleton {
     // the screen whose frame shows it; null means every screen's
     property var screen: null
     property string query: ""
-    // "" searches; "clipboard" lists the clipboard history
+    // "" searches; "clipboard" lists the clipboard history; "themes" is the
+    // theme switcher (picker/ThemePicker.qml), which has the panel to itself
     property string mode: ""
     readonly property bool clipboardMode: mode === "clipboard"
+    readonly property bool themesMode: mode === "themes"
 
     function show(onScreen, text, inMode) {
         screen = onScreen ?? Quickshell.screens[0] ?? null;
@@ -103,6 +106,14 @@ Singleton {
 
         function clipboard(): void {
             root.toggleMode("clipboard");
+        }
+
+        function themes(): void {
+            root.toggleMode("themes");
+        }
+
+        function mode(): string {
+            return root.mode;
         }
     }
 

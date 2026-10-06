@@ -38,7 +38,7 @@ Rectangle {
             return Theme.accent;
         if (active || (interactive && hovered))
             return Theme.surfaceHover;
-        return "transparent";
+        return Theme.none;
     }
 
     Behavior on color {

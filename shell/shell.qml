@@ -5,6 +5,12 @@ ShellRoot {
     Hotkeys {}
     PlasmaPanels {}
 
+    // a singleton exists once something names it; these have work to do
+    // at the start
+    readonly property var loginScreen: LoginScreen
+    readonly property var themeExport: ThemeExport
+    readonly property var looks: Looks
+
     Variants {
         model: Quickshell.screens
 

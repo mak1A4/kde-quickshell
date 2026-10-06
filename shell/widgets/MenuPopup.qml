@@ -118,7 +118,7 @@ PopupWindow {
                     anchors.fill: parent
                     visible: !entry.separator
                     radius: Theme.radius
-                    color: mouse.containsMouse || (child.item?.visible ?? false) ? Theme.surfaceHover : "transparent"
+                    color: mouse.containsMouse || (child.item?.visible ?? false) ? Theme.surfaceHover : Theme.none
                 }
 
                 RowLayout {

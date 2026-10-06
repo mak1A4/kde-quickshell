@@ -49,6 +49,12 @@ Scope {
             run: () => CommandPalette.toggleMode("clipboard")
         },
         {
+            id: "show-themes",
+            name: "Show theme switcher",
+            key: 0,
+            run: () => CommandPalette.toggleMode("themes")
+        },
+        {
             id: "toggle-notifications",
             name: "Show notifications",
             key: 0,
@@ -63,7 +69,9 @@ Scope {
     // The keeper outlives the shell and gives the keys back when the shell's
     // process is gone. A reload starts it again; it then finds itself
     // running and leaves.
-    Component.onCompleted: Quickshell.execDetached(["sh", script, "keep", String(Quickshell.processId)].concat(registerArgs))
+    // in a systemd scope of its own, so that it outlives the shell's unit
+    // (see PlasmaPanels.qml)
+    Component.onCompleted: Quickshell.execDetached(["sh", "-c", 'if command -v systemd-run > /dev/null; then exec systemd-run --user --scope --quiet -- "$@"; else exec "$@"; fi', "sh", "sh", script, "keep", String(Quickshell.processId)].concat(registerArgs))
 
     // on every load, so that a reload picks up a changed list of actions
     Process {

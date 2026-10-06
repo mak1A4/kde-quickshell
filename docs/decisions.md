@@ -179,6 +179,23 @@ To open it with a key: System Settings > Keyboard > Shortcuts > Add New > Comman
 `qs ipc -p /path/to/shell call launcher toggle`. The Meta key alone is wired by KWin to
 Plasma's own launcher and was left as it is.
 
+- **Pointer and wheel in the list** (`widgets/PickList.qml`, 2026-10-06). The highlight
+  follows the pointer in `Theme.followDuration` (70 ms), not in the 200 ms a key press
+  takes: the pointer is already on the row, and a highlight still on its way there read
+  as lag. The wheel moves the list by whole rows, one a notch, animated by the list
+  itself: ListView's own wheel handling is a flick of about 72 px with the turning's
+  speed added, and on 54 px rows with snapping that was now one row, now two, with a
+  tug at the end. A touchpad's pixels move the list directly and it settles on a row
+  when they stop. Tested: the arithmetic, headless, with made-up wheel events (single
+  and quick notches, the ends, small turns adding up, pixels, a key afterwards). Not
+  tested: a real wheel.
+- **After a key, the pointer must travel 6 px before it selects again** (2026-10-06).
+  The selection jumped back to the row under the pointer during keyboard navigation.
+  Any movement of a pixel counted as the pointer moving, and a mouse beside a keyboard
+  that is typed on moves that much (taken to be the cause; not observed). Tested
+  headless with made-up reports: shakes of up to 4 px after a key change nothing, a
+  real move selects, and from then on every move does again.
+
 ## Command palette (KRunner's search, own panel)
 
 `qs ipc -p <config> call palette toggle` (also `open`, `close`, `search <text>`) slides a
@@ -516,6 +533,32 @@ Tested: where KWin has the panel with the shell running, stopped, started, kille
 restarted at once, and after restarting plasmashell; the edge push in both states; the
 panel's settings in Plasma unchanged afterwards.
 
+### The desktop's icons too, and the keepers out of the shell's unit
+
+- **No icons on the desktop while the shell runs** (2026-10-06, at the user's wish: one
+  folder lay there, for things to be out of the way). Plasma's desktop is one of two
+  layouts, "Folder View" with icons and "Desktop" without, and only its own dialog
+  switches them: the type is read-only for scripts and nothing on D-Bus sets it. But
+  Folder View has a file filter, and Plasma's scripting can write it: "hide what
+  matches `*`", with the list of file types `all/all` (without that list nothing
+  matches), is an empty desktop at once. The same keeper as for the panels
+  (`panels.sh`) sets it and puts back what was there when the shell is gone; what was
+  there is in `~/.local/state/kde-quickshell/desktop-icons-before` meanwhile. No file
+  is moved. `panels.sh show-icons` and `hide-icons` do it by hand.
+- **The keepers were ended with the shell.** Since the shell is started at login as a
+  systemd unit, the keepers (this one and the shortcuts') were processes of that unit,
+  and systemd ends a unit's processes with it: nothing was undone, the panels stayed
+  parked. They are started in a scope of their own now (`systemd-run --user --scope`).
+
+Tested: the filter written and Plasma's desktop photographed (`grabContainmentImage`
+of `org.kde.PlasmaShell`, which shows it without the windows in front): the icon gone,
+back, gone; the note not overwritten by a second hiding; the shell's unit stopped: icon
+back and the note removed; started: gone. Before the scope: stopped, and nothing came
+back. Then the panels and the shortcuts as well, with the unit stopped and started: the
+panel where KWin has it (a KWin script printing its geometry: y 11024 parked, 1024
+with the shell stopped, 11024 again), and a real Meta+Space, which opens the palette
+while the shell runs and KRunner while it does not.
+
 ## Clipboard history in the palette
 
 Meta+V (an override of Klipper's "Show Clipboard Items at Mouse Position", see "Global
@@ -704,6 +747,403 @@ Plasma's task manager; the shell adds the gestures and keeps the list.
 - A click meant for the menu went into the user's window: the menu had closed while
   screenshots were taken to make sure it was open. A popup that grabs the focus does
   not outlast other programs; open it and click in one run of `pointer.py`.
+
+## Themes: a file of colours, chosen by name
+
+The shell's colours were constants in `Theme.qml`; they now come from a theme (2026-10-05,
+a first experiment). A theme is colours and, if it likes, a background (below). Sizes,
+rounding and motion are still fixed.
+
+- **Themes are existing ones**, not made here (2026-10-06): Catppuccin (four), Tokyo
+  Night, Gruvbox, Nord, Everforest (two), Kanagawa, Rosé Pine (two), Solarized (two),
+  Dracula, Breeze (two). First there were themes generated from each wallpaper's
+  colours; the user did not want invented themes, and an existing one has its colours
+  for every program already. `tools/theme-from-picture.py` is gone.
+- **A theme is `<name>.json`**, `{ "colors": { ... }, "apps": { "nvim": "..." } }`. The
+  shell is drawn with `bg`, `surface`, `surfaceHover`, `surfaceActive`, `fg`, `fgDim`,
+  `accent`, `accentFg`, `warning`, `error` and `desktops` (a list, one per virtual
+  desktop; optionally `tooltipBg`, `tooltipFg`). For what is outside the shell there are
+  `view` (the background of what an application shows, where `bg` is its window's) and
+  the terminal's: `terminal` (its sixteen colours), `terminalBackground`,
+  `terminalForeground`, `terminalCursor`, `terminalSelection`. The terminal's are taken
+  as Ghostty ships each theme (`/usr/share/ghostty/themes`), the others from the theme's
+  published palette. `apps` names the theme where a program has it under a name of its
+  own. In `shell/themes` (the shell's) and in `~/.config/kde-quickshell/themes` (the
+  user's; a file there replaces the shell's of the same name, whole). The name shown is
+  made from the file's name ("tokyo-night": "Tokyo Night"), so listing the themes reads
+  no file.
+- **Catppuccin Mocha is in `Theme.qml` itself**, not a file: the shell has its colours
+  with no file at all, and a theme may leave colours out. A value that is not `#rgb`,
+  `#rrggbb` or `#aarrggbb` is left out too, with a warning in the log.
+- **The choice** is `{ "theme": "<name>", "backgrounds": { "<theme>": "<file>" } }` in
+  `~/.config/kde-quickshell/theme.json`, written by `Themes.set()` and
+  `Themes.setBackground()`: the ">" actions "Theme: ..." and "Background: ..." of the
+  launcher and the palette, or `qs ipc call theme set <name>` (also `get`, `list`,
+  `backgrounds`, `setBackground`). The file is watched, so writing it by hand changes
+  the theme as well.
+- **Read before the first frame.** The choice and the chosen theme's file are read
+  blocking when `Themes` is made, so the shell never starts in one theme and changes to
+  another. Only the list of themes (`FolderListModel`) arrives later.
+- **Saving the chosen theme's file recolours the shell**, for working on a theme. A file
+  that cannot be parsed changes nothing until it can.
+- **A change fades** over `Theme.fadeDuration`. One number, `Theme.blend`, runs from 0
+  to 1 and every colour is `Qt.tint(from, Qt.alpha(to, blend))`: one animation for all
+  of them, and the list of desktop colours fades too, which a `Behavior` per colour
+  could not do.
+- **What is watched and what is not.** Quickshell's `FileView` does not notice a file
+  that appears where there was none. Hence: the user's theme directory is made at the
+  start; a change in it reloads the chosen theme's file; and the choice is read again
+  after it has been written.
+### A theme's background: one picture or video for desktop, lock screen and login
+
+A theme's backgrounds are the pictures and videos in
+`~/.config/kde-quickshell/themes/backgrounds/<theme>/`: to give a theme a background, a
+file is put there. The desktop, the lock screen and the login screen show the one chosen
+for the theme (the first, until another is chosen); with a theme that has none they show
+what they are set to in Plasma. First a theme named one file (`"background": ...`); with
+existing themes a theme has several, and which goes with which is the user's to say by
+moving a file.
+
+- **The directory is listed by `ls`**, at a change of theme and when something in it
+  changes, and the list is kept together with the theme it is of. With a
+  `FolderListModel` bound to the theme's directory, a change of theme had the new theme
+  and the old theme's files for a moment, and the desktop was given a background that
+  does not exist.
+- **Each background has a name of its own** for `background.sh` (`<theme>-<file>`): by a
+  new name the wallpaper knows a new file.
+
+- **One Plasma wallpaper for all three** (`plasma/background`,
+  `io.github.mak1a4.kde-quickshell.background`): the desktop is still plasmashell's, the
+  lock screen is KDE's (`kscreenlocker`; KWin has no `ext_session_lock_v1`, so the shell
+  cannot lock), and the login screen is Plasma Login Manager's, whose interface is
+  compiled in and takes nothing but a wallpaper. A wallpaper plugin is the one thing all
+  three load.
+- **It has no settings; it shows the one file in a directory.** So a change of theme
+  writes no Plasma configuration, it replaces a file (`shell/background.sh`):
+  `~/.local/share/kde-quickshell/background` holds a link, and
+  `/var/lib/kde-quickshell/background` a copy, because the login screen runs as its own
+  user and cannot read a home directory (mode 700 here). The file is named after the
+  theme, so that a new theme is a new name and the wallpaper loads it; the wallpaper
+  watches both directories and takes the user's first. A video loops, without sound.
+- **Taking over and giving back.** With a background, the script sets the desktop's
+  wallpaper (Plasma's scripting over D-Bus) and the lock screen's (`kscreenlockerrc`) to
+  this one and notes what they had (`~/.local/state/kde-quickshell/wallpaper-before`);
+  with a theme without one it puts that back, so the user's own wallpaper and its
+  settings are untouched. The login screen cannot be switched without root and keeps this
+  wallpaper; it is given a copy of the desktop's picture then.
+- **The login screen is kept in step by the shell, which asks for the password**
+  (2026-10-06; first a script to be run by hand with `sudo`, which was forgotten, and
+  the login screen had neither the background nor the display's scaling).
+  `shell/login.sh apply`, as root: installs the wallpaper for everyone, makes the
+  directory in `/var/lib`, owned by the user, sets the wallpaper in
+  `/etc/plasmalogin.conf.d/kde-quickshell.conf`, and copies the user's `kxkbrc`,
+  `kdeglobals`, `plasmarc`, `kcminputrc`, `kwinoutputconfig.json` and
+  `fontconfig/fonts.conf` to the login screen's user: what "Apply Plasma Settings" in
+  System Settings does (its helper is KAuth over D-Bus, not something a script calls, so
+  the six files are copied here, read as the user and written as `plasmalogin`).
+  - **Asked only when something changed.** `login.sh check` boils what would be applied
+    down to one word and compares it with the one noted at the last `apply`
+    (`/var/lib/kde-quickshell/applied`). Not the files as they are: `kdeglobals` changes
+    with every file dialog, `kwinoutputconfig.json` with a monitor's brightness and with
+    each screen cast's virtual output. Into the word go the wallpaper's files, four of
+    the six files whole, the keys of `kdeglobals` for font, colours, icons and scale,
+    and of each real monitor its mode, scale and turn.
+  - **When:** five seconds after the shell's start (`LoginScreen.qml`), through
+    `pkexec`, so the question is Plasma's own dialog. A question that was closed is not
+    asked again for that state (`~/.local/state/kde-quickshell/login-declined`); the
+    ">" action "Update the login screen" and `qs ipc call login apply` ask anyway. A
+    change of scaling during the session is taken up at the next start, not at once.
+  - **The dialog explains itself from the second time on:** `apply` installs a polkit
+    action naming this script, with a sentence saying what the password is for. The
+    first time it is pkexec's bare "run login.sh as the super user".
+  - A change of theme needs no root: `background.sh` replaces the copy in `/var/lib`.
+  - `sudo shell/login.sh undo` removes what was installed; the copied settings are
+    reset in System Settings, Login Screen.
+- **Backgrounds from qylock.** `tools/qylock.sh` fetches the backgrounds of
+  [qylock](https://github.com/Darkkal44/qylock) that are a wallpaper on their own (30
+  of them; not the ones that are a game's menu or need the screen built around them)
+  into the directory of the existing theme each goes with best, by eye. About 470 MB,
+  not in this repository: most are artwork of games and films.
+- **Dead end:** `videoOutput: parent` in a `MediaPlayer` inside its `VideoOutput` showed
+  black: a `MediaPlayer` is no `Item` and has no `parent`. It takes the output by `id`.
+
+**Testing the lock screen without locking.** `kscreenlocker_greet --testing` shows the
+lock screen as a window. Run in a compositor nobody sees, it disturbs nothing:
+`dbus-run-session` around `kwin_wayland --virtual --socket wl-test --no-lockscreen`, the
+greeter with `WAYLAND_DISPLAY=wl-test` and an `XDG_CONFIG_HOME` whose `kscreenlockerrc`
+names the wallpaper, then `spectacle -b -n -f -o` in the same session photographs the
+virtual screen. Started under `setsid`, and ended with `kill -TERM 0`: otherwise the
+portals that session starts stay behind.
+
+Tested: the wallpaper on the lock screen that way, with a picture and with a video. On
+the real desktop: `forest` (video) and `material-you` (picture) chosen by IPC, the
+desktop's and the lock screen's wallpaper switched, the video opened by plasmashell (3 %
+of a core), and back to a theme without a background: both as before, `kscreenlockerrc`
+byte for byte. Not tested: the real lock screen (only its test mode, which may differ in
+what the greeter is allowed to do); the desktop itself was
+behind windows and was judged by plasmashell's log, not seen; `tools/qylock.sh`
+fetching (the files were already there).
+
+Tested headless (`Theme.qml`, `Themes.qml` and the themes in a scratch config, against a
+scratch `XDG_CONFIG_HOME`): start with and without a choice; `set` with a theme, with a
+name that does not exist and with a path; the fade; a theme of the user's own added,
+changed, broken, mended and removed while chosen; the choice written by hand before and
+after the shell wrote it; a choice naming no theme. On screen, by IPC: Catppuccin Latte,
+Breeze Light and Gruvbox Dark with the palette open on "Theme: ...". Not tested: Enter on
+a theme in the palette or the launcher; panels other than the palette in a light theme
+(notifications, mixer, session menu, dock); Breeze Dark and Tokyo Night on screen.
+
+## Theme switcher: the looks as a row of pictures
+
+Themes were chosen from a list of names among the ">" actions. Now there is a switcher
+to look through them (2026-10-06), after Caelestia's wallpaper list in its launcher: a
+row of pictures, the one in the middle large and ringed in its theme's accent, its
+neighbours smaller, moved with the arrow keys, the wheel or a click.
+
+- **A look is a theme with one of its backgrounds**, and a theme without any once, as a
+  small drawing of its own colours. One row, not themes and then backgrounds: choosing
+  is one step. `shell/looks.sh` lists them and makes a small picture of each background
+  with ffmpeg (a video's frame two seconds in) in `~/.cache/kde-quickshell/thumbnails`;
+  `Looks.qml` runs it at the shell's start, so the pictures are there when the switcher
+  first opens (3 s for 30 the first time, then nothing).
+- **It is a mode of the command palette** (`CommandPalette.mode: "themes"`,
+  `picker/ThemePicker.qml`), as the clipboard history is: the frame's shader has five
+  panels and all are taken, and the palette's panel, its keyboard and its closing were
+  there to use. Opened by "Theme switcher" among the ">" actions, `qs ipc call palette
+  themes`, or the shortcut "Show theme switcher" (none by default).
+- **Looking is not choosing.** The look in the middle, after 120 ms of rest there,
+  colours the shell (`Themes.preview`, which `Theme.chosen` is drawn from) and nothing
+  else: KDE, the terminals and the desktop keep the theme in use (`Theme.applied`,
+  which `ThemeExport` writes down). Enter, or a click on the middle one, chooses theme
+  and background together (`Themes.choose`); Escape puts the shell's colours back. The
+  preview is kept until the chosen theme's file is read, or the old theme would show
+  for a moment in between.
+- **The background opens out from the middle.** In the wallpaper (`plasma/background`)
+  a new file is loaded into a second layer and seen through a growing disc
+  (`MultiEffect` with a mask) over the one before, in 0.9 s, once it has something to
+  show; the first file at the start is simply there. For that the directory is never
+  empty during a change now (`background.sh` puts the new file there before it takes
+  the old one away), and the wallpaper waits 150 ms for the directory to rest: an
+  empty directory had it fall back to the login screen's copy for a moment.
+- **Dead end:** in the wallpaper the layer's `id` was `layer`. Inside the video's own
+  component that name is the `layer` every Item has, the video got no source and never
+  showed. It is `pane`.
+
+Tested on the running session, with real key presses (the palette holds the keyboard):
+opened by IPC; three looks to the right, the frame in the middle look's colours,
+Escape and the frame as before; Enter on a look, and theme, background, KDE's scheme
+and the choice file changed; two backgrounds of one theme one after the other; in a
+light and a dark theme. The wallpaper's opening in the hidden compositor, on the lock
+screen's test mode: picture to video and video to picture, photographed halfway and
+after. Not tested: a click or the wheel in the row, the opening on the real desktop
+(behind windows; plasmashell opened the files), a theme added while the switcher is
+open.
+
+## The theme outside the shell: KDE's colours, terminals, Neovim
+
+A change of theme changes KDE's colours, the terminals, tmux and Neovim with it
+(2026-10-06), in the way [Omarchy](https://github.com/basecamp/omarchy) does: the theme
+is written down as a flat list of names and values, templates are filled in with it, one
+per program, each program is pointed at its file once, and the running ones are told to
+read again.
+
+- **`ThemeExport.qml`** writes `~/.local/state/kde-quickshell/theme/colors.json`: every
+  colour as `#rrggbb`, as `r,g,b` (`_rgb`) and without the `#` (`_strip`), the sixteen
+  terminal colours, a few mixed ones KDE's scheme has names for and a theme does not,
+  `mode` (dark or light, by the brightness of `bg`), the theme's name, and the shell's
+  sizes. A quarter of a second after the last change: a change of theme is its name
+  first and its colours a moment later.
+- **`shell/apply.sh`** fills the templates in `shell/themed` (`{{ name }}`) and puts each
+  where its program reads it. A program is only told if its file changed, so the script
+  runs at every start of the shell.
+- **KDE: a colour scheme per theme** (`~/.local/share/color-schemes/Quickshell<Name>.colors`),
+  made the current one with `plasma-apply-colorscheme`. That covers Qt and KDE
+  applications and window borders, GTK applications through KDE's own settings daemon,
+  and **whether the desktop counts as dark or light**: KDE works that out from the
+  scheme's window colour, and it is what an application that "follows the system" is
+  told (`org.freedesktop.appearance color-scheme` on the portal: 1 with a dark theme, 2
+  with a light one, checked). `plasma-apply-colorscheme` refuses the scheme that is
+  already current, also when its file has changed, so then Breeze is applied in between.
+  What KDE had before the first theme is noted in
+  `~/.local/state/kde-quickshell/colorscheme-before`.
+- **KDE's selection colour is the accent, made pale** (`selectionFor` in
+  `ThemeExport.qml`). Dolphin fills a selected row with a share of the selection colour
+  over the view (a third; 65 % under the pointer, measured in a screenshot), puts the
+  ordinary text on it, and draws an outline in the colour itself, slightly darker. Two
+  things were wrong with the accent as it is. The text had a contrast of 2.2 to 3.6 in
+  every theme but Breeze's (4.5 is what text wants; Rosé Pine Dawn, where the user saw
+  it: 3.2). And the corners looked pixelated: Dolphin's outline is 1.25 pixels wide
+  round a corner of 5, and at the user's 133 % that is drawn in steps (seen at sixteen
+  times, Dolphin rendered in the hidden compositor with `--scale 1.3333`); nothing in a
+  theme changes that drawing, only how dark the line is against the view. So the accent
+  is taken towards the view in steps of 5 % until the text reads at 4.5 and the outline
+  stands out from the view by no more than 1.7. That is 65 to 90 % of the way: a pale
+  selection, which the user chose over the steps. It is also what KDE draws checked
+  boxes and progress bars in. Focus rings and hover outlines keep the accent.
+  - **On a light theme nothing highlighted may be lighter than the window** (the user's
+    rule). The place one is in, hovered in Dolphin's side bar, was a near-white bar on
+    cream. A first explanation (that KDE lightens a hovered selection by a fifth) was a
+    guess from one screenshot and wrong, and the limit built on it did not help. What
+    it is, found by asking the installed Breeze to paint a row in each state with the
+    palette applications really get (a few lines of PyQt, `QStyle::drawPrimitive`, no
+    window): in a window that is not the active one KDE uses a selection colour of
+    its own, a good deal lighter (`ChangeSelectionColor` in `[ColorEffects:Inactive]`,
+    on in Breeze's schemes), and Breeze makes a selected row under the pointer a tenth
+    lighter again. Selected, hovered, window not active: `#fef8ff`, to the digit what
+    the screenshot had. So the scheme sets `ChangeSelectionColor=false` (a selection
+    looks the same in an inactive window), and the softening of the colour ends before
+    the colour, a tenth lighter, would stop being darker than the window. All six
+    states (hover, selected, both; window active or not) are darker than the window
+    now, read back the same way.
+- **The icon theme follows the mode** if it comes as a pair (`Papirus-Light`,
+  `Papirus-Dark`): dark icons on a dark toolbar otherwise.
+- **Terminals:** `ghostty.conf` (Ghostty reads its configuration again at `SIGUSR2`;
+  checked that it catches the signal before sending one) and `wezterm.lua` (WezTerm
+  watches the file). Whatever runs in a terminal and uses its sixteen colours follows by
+  itself (bat, lazygit, yazi, fzf, the prompt).
+- **tmux:** `tmux.conf` has the neutral tones (status line, borders), `tmux source-file`
+  reloads them; the coloured parts of the status line use the terminal's named colours.
+- **Neovim:** `nvim.lua` sets the background and the colour scheme the theme names in
+  `apps.nvim` (the theme's own Neovim plugin), and is run again in every open Neovim
+  through its server socket.
+- **The lock screen's `Look.qml`** is one of the templates too; `Theme.qml` no longer
+  writes it.
+- **The login screen's colours do not follow a change of theme.** They are copied there
+  as root (`login.sh`), and the colour scheme was taken out of what makes the shell ask
+  for the password, or every change of theme would. They are those of the last time
+  something else was applied, or of "Update the login screen".
+- **The user's dotfiles had their own switching** (a `theme-sync` service: Solarized
+  light or dark in WezTerm, tmux and Neovim by the name of KDE's global theme). It was
+  removed at the user's wish, and the configurations there now include the shell's files
+  where they exist, with Solarized by the system's appearance as the fallback.
+- **btop:** `~/.config/btop/themes/kde-quickshell.theme` is the theme btop ships of the
+  same name where it has one (`apps.btop`), else a template filled in; `btop.conf` names
+  that one theme, and a running btop reads it again at `SIGUSR2`.
+- **VS Code:** the theme's own colour theme by the name VS Code lists it under
+  (`apps.vscode`), written into `settings.json` as `workbench.colorTheme` and as both the
+  preferred dark and light one: with "follow the system" on, VS Code takes one of those
+  and not the first. It reads its settings again by itself. The extensions that hold the
+  colour themes are installed by `tools/vscode-themes.sh`, once, not at a change of
+  theme: an extension is a program.
+- **Browsers, Omarchy's way:** Chromium and what is made from it (Helium reads
+  Chromium's directory) take `BrowserThemeColor`, the theme's `bg`, from machine policy
+  (`/etc/chromium/policies/managed/kde-quickshell.json`), and a running browser takes it
+  up when started once more with `--refresh-platform-policy`. Policy is root's to write.
+  `login.sh` installs `shell/browser-color.sh` as
+  `/usr/local/libexec/kde-quickshell-browser-color`, root's, and a polkit action that
+  lets the user's active session run that one file without the password; it accepts six
+  hexadecimal digits and writes nothing else, to directories it names itself. Not a
+  policy file the user may write: policy can install extensions and set proxies. This
+  overrides a colour chosen in the browser (Helium's was a green of the user's own).
+  - **Helium with vertical tabs does not take it well.** Tried in a Helium of its own
+    (scratch profile, hidden compositor) with eleven colours: the sidebar of the active
+    window is the given colour made lighter (black gives `#383838`, the theme's
+    `#272e33` gives `#454f57`), never as dark as the theme's frame, and the tabs are
+    drawn darker than the sidebar, so a dark neutral colour comes out as a washed slate
+    with dark pills. Only the hue and how grey it is can be chosen. Chromium's own
+    horizontal tabs look right with the same colour. Open: which colour to give
+    (the theme's `bg` as Omarchy does, or one tinted with the accent).
+  - **The policy can be switched off** (`"browsers": "system"` in `theme.json`; the ">"
+    action "Browsers: colour from KDE", `qs ipc call theme setBrowsers system|policy`).
+    While it is there a browser locks its own theme setting ("Theme is set by your
+    Organization"), and Helium has a "Use QT" there that takes KDE's colours, which are
+    the theme's. With "system" the helper removes the policy file and the shell keeps
+    out. Which of the two looks better in Helium is for the user to say.
+  - **What "Use QT" takes from KDE**, found by giving every role of the colour scheme a
+    loud colour of its own (test Helium, hidden compositor): the sidebar and the toolbar
+    are `[Colors:Button] BackgroundNormal`, the "New Tab" pill is `[WM]
+    inactiveBackground`, the line round the page is `[Colors:Window] BackgroundNormal`.
+    Pinned tabs and other tabs get no box at all in this mode, whatever the colours:
+    that is not a colour to be set. So single parts cannot be styled, only these roles
+    changed, and they are every KDE application's too.
+  - **A browser theme of our own was tried too** (an unpacked extension with a `theme`
+    of colours, `--load-extension`, in a test Helium shielded from the machine's policy
+    by `bwrap --tmpfs /etc/chromium/policies`). It sets exact colours, but few parts:
+    the sidebar, the toolbar and the active tab are `toolbar`; inactive tabs, pinned
+    tabs and "New Tab" are all `background_tab`; the texts and icons have their own.
+    Pinned tabs have no outline of their own, only that fill, so "tabs as the sidebar,
+    pinned tabs outlined" (what the user asked for) is not to be had from outside
+    Helium. And a browser only reads such a theme at its start. Not built.
+- **Not covered:** Konsole; Firefox.
+
+Tested, on the running session: `everforest`, `solarized-light` and `tokyo-night` chosen
+by IPC and each time KDE's scheme, the portal's answer, the icon theme, Ghostty's
+configuration, tmux's status style, the colour scheme and background of a running
+Neovim, and WezTerm's file read back; GTK's dark setting for one light and one dark
+theme; a screenshot with `everforest`. Headless: theme changes with backgrounds in
+scratch directories, the list after a change of theme, a stored choice of background, a
+file added to the directory. Not tested: WezTerm on screen (it was not running; its
+configuration loads), a GTK or Electron application on screen, `tools/qylock.sh`
+fetching, Enter on "Background: ..." in the palette. For btop, VS Code and the browsers:
+`tokyo-night` and `everforest` chosen, and each time the policy file (written without a
+question for the password), the name in VS Code's settings and btop's theme file read;
+Helium's toolbar seen to lose its green; every theme's VS Code name checked against the
+colour themes the installed extensions and VS Code itself declare (three were wrong).
+Not seen on screen: VS Code and btop themselves.
+
+## Lock screen: KDE's locker, the shell's interface
+
+The session is locked by KDE (`kscreenlocker`); the shell cannot do it, KWin has no
+`ext_session_lock_v1`. But the locker's whole interface is QML, and `plasma/lockscreen`
+replaces it (2026-10-05): the shell's frame round the wallpaper, a clock on it, and two
+panels that come out of the frame at a key or a move of the pointer and go back after
+ten idle seconds or at Escape. From the top edge, where the command palette hangs, the
+password: a pill as the palette's field, the user's picture or initial in it, the
+palette's key hints below. From the bottom edge, where the dock is: sleep, hibernate,
+switch user, as far as the session allows them.
+
+- **The frame is the shell's own shader** (`shell/shaders/frame.frag.qsb`, copied in at
+  installation), so the panels flow out of the border with the same fillets and
+  overshoot. Plain Qt Quick otherwise; no Plasma components, which is what made it look
+  like Plasma.
+- **Colours and sizes come from the shell in a file.** The locker is another program
+  and cannot read the theme. `Theme.qml` writes `~/.local/share/kde-quickshell/lock/Look.qml`
+  at its start and at each change of theme, a `QtObject` of properties, and the lock
+  screen loads it with a `Loader`; without the file it has `DefaultLook.qml` (Catppuccin
+  Mocha). A QML file because that is what plain QML can read: reading JSON from a file
+  is switched off in Qt 6.
+- **How the locker is made to use it.** It takes the interface from the "shell package"
+  Plasma runs with: `ShellPackage` in `plasmashellrc`, else `PLASMA_DEFAULT_SHELL`, else
+  `org.kde.plasma.desktop`. Setting the first would change plasmashell as well (another
+  package, another file of panels and widgets). A copy of Plasma's package in the home
+  directory with the lock screen exchanged would go stale at every Plasma update. So:
+  the package holds nothing but `contents/lockscreen`, and the variable is set for KWin's
+  service alone (`~/.config/systemd/user/plasma-kwin_wayland.service.d/kde-quickshell-lock.conf`),
+  because KWin starts the locker and plasmashell is another service. `tools/lockscreen.sh`
+  does both, `--undo` removes both. KWin has its environment from its start, so it counts
+  from the next login; a changed lock screen (the tool again) from the next lock.
+- **If it fails.** QML that does not load: the locker shows its built-in screen. QML
+  that loads and cannot be used: `loginctl unlock-sessions` from a console.
+- **What is not there** of Plasma's lock screen: media controls, the on-screen keyboard,
+  the keyboard layout button, the battery, volume and brightness messages, the hints for
+  fingerprint and smartcard (they still unlock; nothing says so).
+- **Behaviour kept from Plasma's:** the password is shared between the monitors'
+  screens (`PasswordSync`); a wrong one blocks the field for three seconds and clears
+  it; typed text is cleared before the machine sleeps; a session unlocked without a
+  password having been asked for waits for Enter. The Enter that only brought the panel
+  out is not sent as an empty password.
+
+Tested in the hidden compositor (see "Testing the lock screen without locking"), in the
+locker's test mode: idle; the panels out (by changed copies of the QML: there is no
+keyboard in that compositor); a password in the field; the look after a wrong password;
+that the field has the keyboard focus and the window is active; the theme's colours
+from `Look.qml`; the package found through `PLASMA_DEFAULT_SHELL` with the user's own
+`plasmashellrc`; `tools/lockscreen.sh` and `--undo` against scratch directories. Not
+tested: anything in the real locker (it has the environment only after a login): typing,
+unlocking, a wrong password as PAM reports it, sleep and switch user, the motion of the
+panels (only stills were taken), two monitors, a user picture (this user has none).
+
+## Started at login by a KDE autostart entry
+
+`~/.config/autostart/kde-quickshell-shell.desktop` runs
+`/usr/bin/qs -n -p <this repository>/shell` (2026-10-06). KDE makes a systemd unit of it
+(`app-kde\x2dquickshell\x2dshell@autostart.service`), and it shows in System Settings
+under Autostart, where it can be switched off. Not in this repository: the path in it is
+this machine's, and it has to be the exact path `qs ipc -p` is called with. No `-d`: the
+unit should hold the process. The unit does not restart a shell that has ended.
+
+Tested: the generated unit started by hand, the shell up and answering IPC. Not tested:
+a login.
 
 ## Testing the pointer: a virtual pointing device
 

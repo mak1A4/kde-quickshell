@@ -13,7 +13,7 @@ Rectangle {
     implicitWidth: 24
     implicitHeight: 24
     radius: Theme.radius
-    color: checked ? Theme.surface : (mouse.containsMouse ? Theme.surfaceHover : "transparent")
+    color: checked ? Theme.surface : (mouse.containsMouse ? Theme.surfaceHover : Theme.none)
 
     Behavior on color {
         ColorAnim {}

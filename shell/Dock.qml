@@ -154,7 +154,7 @@ Item {
                     implicitWidth: 48
                     implicitHeight: 48
                     radius: 12
-                    color: launcherHover.hovered ? Theme.surfaceHover : "transparent"
+                    color: launcherHover.hovered ? Theme.surfaceHover : Theme.none
 
                     Behavior on color {
                         ColorAnim {}

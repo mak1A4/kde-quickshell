@@ -1,0 +1,14 @@
+{
+    "KPackageStructure": "Plasma/Shell",
+    "KPlugin": {
+        "Category": "",
+        "Description": "The lock screen in the style of the Quickshell shell; everything else is Plasma's desktop shell",
+        "Icon": "system-lock-screen",
+        "Id": "io.github.mak1a4.kde-quickshell.lock",
+        "License": "GPL",
+        "Name": "Quickshell lock screen",
+        "Version": "1"
+    },
+    "X-KDE-ParentApp": "org.kde.plasmashell",
+    "X-Plasma-APIVersion": "2"
+}

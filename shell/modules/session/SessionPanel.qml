@@ -54,7 +54,7 @@ Item {
                 Layout.fillWidth: true
                 implicitHeight: 42
                 radius: 9
-                color: armed ? Theme.error : (mouse.containsMouse ? Theme.surfaceHover : "transparent")
+                color: armed ? Theme.error : (mouse.containsMouse ? Theme.surfaceHover : Theme.none)
 
                 Behavior on color {
                     ColorAnim {}

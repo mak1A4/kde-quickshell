@@ -66,7 +66,7 @@ PopupWindow {
                 Rectangle {
                     anchors.fill: parent
                     radius: Theme.radius
-                    color: mouse.containsMouse ? Theme.surfaceHover : "transparent"
+                    color: mouse.containsMouse ? Theme.surfaceHover : Theme.none
                 }
 
                 RowLayout {

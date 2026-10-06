@@ -307,7 +307,7 @@ RowLayout {
                     return Theme.warning;
                 if (model.IsActive)
                     return Qt.tint(Theme.surface, Qt.alpha(root.desktopColor, 0.38));
-                return mouse.containsMouse ? Theme.surfaceHover : "transparent";
+                return mouse.containsMouse ? Theme.surfaceHover : Theme.none;
             }
 
             Behavior on color {

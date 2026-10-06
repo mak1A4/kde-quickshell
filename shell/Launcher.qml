@@ -161,10 +161,10 @@ Singleton {
 
     // ---- actions (">") ---------------------------------------------------
 
-    // The session actions, plus the shell's settings and reloading it. From
-    // here, anything that ends the session goes through KDE's own
-    // confirmation screen: one Enter on a typed query should not be enough to
-    // shut the machine down.
+    // The session actions, plus the shell's settings, reloading it, one per
+    // theme and one per background of the theme in use. From here, anything that ends the session goes through KDE's
+    // own confirmation screen: one Enter on a typed query should not be
+    // enough to shut the machine down.
     readonly property var actions: SessionActions.available.map(action => ({
                 title: action.title,
                 subtitle: action.confirm ? "Asks for confirmation" : "",
@@ -178,12 +178,40 @@ Singleton {
             settings: true
         },
         {
+            title: "Update the login screen",
+            subtitle: "Display scaling, keyboard layout, fonts and the theme's background; asks for the password",
+            icon: "system-users-symbolic",
+            login: true
+        },
+        {
+            title: "Theme switcher",
+            subtitle: "Themes and their backgrounds, to look through",
+            icon: "palette-symbolic",
+            switcher: true
+        },
+        {
+            title: Themes.browsers === "system" ? "Browsers: colour from the theme" : "Browsers: colour from KDE",
+            subtitle: Themes.browsers === "system" ? "The shell sets the theme's colour by policy; the browser's own theme setting is locked" : "The shell stops setting it; choose \"Use Qt\" in the browser's appearance settings",
+            icon: "internet-web-browser-symbolic",
+            browsers: Themes.browsers === "system" ? "policy" : "system"
+        },
+        {
             title: "Reload shell",
             subtitle: "Reload this shell's configuration",
             icon: "view-refresh-symbolic",
             reload: true
         }
-    ])
+    ]).concat(Themes.names.map(name => ({
+                title: "Theme: " + Themes.title(name),
+                subtitle: name === Themes.chosen ? "In use" : "",
+                icon: "palette-symbolic",
+                theme: name
+            }))).concat(Themes.backgrounds.map(file => ({
+                title: "Background: " + Themes.title(file),
+                subtitle: Themes.background.endsWith("/" + file) ? "In use" : "",
+                icon: "image-x-generic-symbolic",
+                background: file
+            })))
 
     // ---- results ---------------------------------------------------------
 
@@ -284,6 +312,16 @@ Singleton {
             Quickshell.reload(false);
         else if (action.settings)
             openSettings();
+        else if (action.switcher)
+            CommandPalette.show(null, "", "themes");
+        else if (action.theme)
+            Themes.set(action.theme);
+        else if (action.background)
+            Themes.setBackground(action.background);
+        else if (action.browsers)
+            Themes.setBrowsers(action.browsers);
+        else if (action.login)
+            LoginScreen.check(true);
         else
             SessionActions.runWithPrompt(action.session);
     }

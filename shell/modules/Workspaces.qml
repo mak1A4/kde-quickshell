@@ -155,7 +155,7 @@ Item {
         height: end - start - 3
         radius: width / 2
         // hollow while all windows are hidden
-        color: KWindowSystem.showingDesktop ? "transparent" : tint
+        color: KWindowSystem.showingDesktop ? Qt.alpha(tint, 0) : tint
         border.width: 3
         border.color: tint
 
@@ -272,7 +272,7 @@ Item {
             width: size
             height: size
             radius: size / 2
-            color: addHover.hovered ? tint : "transparent"
+            color: addHover.hovered ? tint : Qt.alpha(tint, 0)
             border.width: 1.5
             border.color: tint
             opacity: addHover.hovered ? 1 : 0.6
