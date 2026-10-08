@@ -1552,6 +1552,14 @@ keeps the icon it brings.
   as the theme draws it) and an application's icon in colour. A Python test item does
   not end on SIGTERM unless the default handler is put back; nine of them stayed in
   the user's bar for some minutes.
+- **The same for an item that brings a directory for its icon**, where the theme has a
+  one-colour icon of that name (`BarItems.plain()`). Steam names `steam_tray_mono` with
+  its own `public` directory, a grey 48 px pixmap that came out small and pale between
+  the bar's icons; Papirus has a panel icon of that name, and Plasma's tray takes the
+  theme's first too. Only names in the list `icons.sh` gives count here, not the
+  `-symbolic` ending: an icon only the item's directory has would come out as "unknown".
+  Considered: Tabler's `brand-steam` as a default in `symbols.js`, an outline next to
+  filled neighbours, and for Steam alone.
 - **Defaults** are in `modules/tray/symbols.js`: Outlook, Teams and Remote Control have an
   icon unasked. An item is recognised by the icon it names (`krfb`) or by a word in its
   id, title or tooltip.

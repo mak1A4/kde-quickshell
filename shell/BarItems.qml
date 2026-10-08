@@ -67,6 +67,19 @@ Singleton {
         return name.endsWith("-symbolic") || plainIcons[name] === true;
     }
 
+    // The one-colour icon of the icon theme to draw for a tray item's own
+    // icon, by name, or "" to draw the icon as it comes. An item that brings
+    // a directory for its icon gets the theme's of that name where it has
+    // one, as in Plasma's tray: Steam's "steam_tray_mono" is a grey pixmap
+    // there, and Papirus has a panel icon for it.
+    function plain(icon: string): string {
+        const name = Symbols.named(icon);
+        if (name !== "")
+            return isPlain(name) ? name : "";
+        const brought = Symbols.brought(icon);
+        return plainIcons[brought] === true ? brought : "";
+    }
+
     Process {
         running: true
         command: ["sh", Quickshell.shellPath("icons.sh")]

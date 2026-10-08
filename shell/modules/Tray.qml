@@ -34,8 +34,8 @@ ColumnLayout {
             required property SystemTrayItem modelData
             readonly property string symbol: BarItems.icon(modelData)
             // its own icon is one of the icon theme's one-colour icons
-            readonly property bool plain: BarItems.isPlain(Symbols.named(modelData.icon))
-            readonly property string named: Symbols.named(modelData.icon)
+            readonly property string named: BarItems.plain(modelData.icon)
+            readonly property bool plain: named !== ""
             // a one-colour icon has one of the theme's colours, by the item's name
             readonly property color hue: Theme.hueOf(Symbols.key(modelData.id, modelData.title, modelData.tooltipTitle))
 

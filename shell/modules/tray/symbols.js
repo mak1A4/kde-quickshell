@@ -34,6 +34,13 @@ function named(icon) {
     return found ? found[1] : "";
 }
 
+// The name of an icon the item brings a directory for (Steam:
+// "image://icon/steam_tray_mono?path=<its directory>"), else "".
+function brought(icon) {
+    const found = /^image:\/\/icon\/([^?]+)\?path=/.exec(icon);
+    return found ? found[1] : "";
+}
+
 function forItem(id, title, tooltip, icon) {
     const name = named(icon);
     if (name in icons)
