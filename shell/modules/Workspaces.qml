@@ -237,6 +237,7 @@ Item {
             }
 
             MouseArea {
+                cursorShape: Qt.PointingHandCursor
                 anchors.fill: parent
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                 onClicked: event => {
@@ -299,6 +300,7 @@ Item {
         }
 
         MouseArea {
+            cursorShape: Qt.PointingHandCursor
             anchors.fill: parent
             onClicked: root.add()
         }

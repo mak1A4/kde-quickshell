@@ -59,6 +59,7 @@ ColumnLayout {
             }
 
             MouseArea {
+                cursorShape: Qt.PointingHandCursor
                 anchors.fill: parent
                 onClicked: root.pulseObject.default = true
             }

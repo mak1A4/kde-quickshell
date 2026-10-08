@@ -321,6 +321,7 @@ Item {
                 }
 
                 MouseArea {
+                    cursorShape: Qt.PointingHandCursor
                     anchors.fill: parent
                     onClicked: {
                         if (card.middle)

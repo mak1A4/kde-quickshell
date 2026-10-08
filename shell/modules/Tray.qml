@@ -36,6 +36,8 @@ ColumnLayout {
             // its own icon is one of the icon theme's one-colour icons
             readonly property bool plain: BarItems.isPlain(Symbols.named(modelData.icon))
             readonly property string named: Symbols.named(modelData.icon)
+            // a one-colour icon has one of the theme's colours, by the item's name
+            readonly property color hue: Theme.hueOf(Symbols.key(modelData.id, modelData.title, modelData.tooltipTitle))
 
             tucked: !BarItems.expanded && BarItems.hidden(modelData)
             hintTitle: modelData.tooltipTitle || modelData.title || modelData.id
@@ -69,6 +71,7 @@ ColumnLayout {
                     anchors.fill: parent
                     visible: item.symbol === "" && item.plain
                     source: item.named
+                    color: item.hue
                 }
 
                 Icon {
@@ -81,6 +84,7 @@ ColumnLayout {
                     roundToIconSize: glyphSize === 0
                     visible: item.symbol !== ""
                     source: BarItems.source(item.symbol)
+                    color: item.hue
                 }
 
                 Rectangle {

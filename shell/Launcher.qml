@@ -11,8 +11,10 @@ import "launcher/search.js" as Search
 //   qs ipc -p <config> call launcher toggle
 // (bind that to a key in System Settings > Shortcuts).
 //
-// Typing searches applications. ">" lists session actions, "=" calculates;
-// plain arithmetic is recognised without the "=".
+// With nothing typed it is a menu with what KDE's own has: the favourites,
+// all applications or one category of them, the places, the session. Typing
+// searches applications. ">" lists session actions, "=" calculates; plain
+// arithmetic is recognised without the "=".
 Singleton {
     id: root
 
@@ -27,6 +29,7 @@ Singleton {
         CommandPalette.hide();
         Notifications.listOpen = false;
         query = "";
+        category = "favorites";
         open = true;
     }
 
@@ -68,6 +71,28 @@ Singleton {
         function close(): void {
             root.hide();
         }
+
+        // the menu, for scripts and tests: which list is shown, and what is in it
+        function category(key: string): string {
+            if (!root.categories.some(category => category.key === key))
+                return "There are: " + root.categories.map(category => category.key).join(", ");
+            root.category = key;
+            return key;
+        }
+
+        function listing(): string {
+            return root.listing.map(row => row.title).join("\n");
+        }
+
+        function categories(): string {
+            return root.categories.map(category => category.key).join("\n");
+        }
+
+        // adds an application to the favourites, or takes it out
+        function favorite(id: string): string {
+            root.toggleFavorite(id);
+            return root.favorites.join("\n");
+        }
     }
 
     // ---- applications ----------------------------------------------------
@@ -83,6 +108,277 @@ Singleton {
                     keywords: String(entry.keywords).toLowerCase()
                 }
             }))
+
+    // ---- the menu: favourites, categories, places -------------------------
+
+    // what is listed while nothing is typed: the key of one of `categories`
+    property string category: "favorites"
+
+    // KDE's menu, as far as it is a matter of categories: the main
+    // categories a desktop entry can name (freedesktop's), under the names
+    // KDE's menu has them. An application is in every one it names.
+    readonly property var groups: [
+        {
+            key: "development",
+            title: "Development",
+            icon: "applications-development-symbolic",
+            match: ["Development"]
+        },
+        {
+            key: "education",
+            title: "Education",
+            icon: "applications-education-symbolic",
+            match: ["Education", "Science"]
+        },
+        {
+            key: "games",
+            title: "Games",
+            icon: "applications-games-symbolic",
+            match: ["Game"]
+        },
+        {
+            key: "graphics",
+            title: "Graphics",
+            icon: "applications-graphics-symbolic",
+            match: ["Graphics"]
+        },
+        {
+            key: "internet",
+            title: "Internet",
+            icon: "applications-internet-symbolic",
+            match: ["Network"]
+        },
+        {
+            key: "multimedia",
+            title: "Multimedia",
+            icon: "applications-multimedia-symbolic",
+            match: ["AudioVideo", "Audio", "Video"]
+        },
+        {
+            key: "office",
+            title: "Office",
+            icon: "applications-office-symbolic",
+            match: ["Office"]
+        },
+        {
+            key: "system",
+            title: "System",
+            icon: "applications-system-symbolic",
+            match: ["System", "Settings"]
+        },
+        {
+            key: "utilities",
+            title: "Utilities",
+            icon: "applications-utilities-symbolic",
+            match: ["Utility", "Accessibility"]
+        }
+    ]
+
+    // every application, by name
+    readonly property var sorted: apps.map(app => app.entry).sort((a, b) => a.name.localeCompare(b.name))
+
+    // The favourites, in their order; one whose application is gone is
+    // left out (and kept in the list: it may be installed again).
+    readonly property var favoriteEntries: {
+        const byId = {};
+        for (const entry of sorted)
+            byId[entry.id] = entry;
+        return favorites.map(id => byId[id]).filter(entry => entry);
+    }
+
+    // [{ key, title, icon, entries }]: all applications, then each group
+    // that has any, then what is in none. The favourites are kept apart, so
+    // that marking one does not make every other list anew.
+    readonly property var grouped: {
+        const list = [
+            {
+                key: "all",
+                title: "All Applications",
+                icon: "applications-all-symbolic",
+                entries: sorted
+            }
+        ];
+        const taken = {};
+        for (const group of groups) {
+            const members = sorted.filter(entry => entry.categories.some(category => group.match.includes(category)));
+            for (const entry of members)
+                taken[entry.id] = true;
+            if (members.length > 0)
+                list.push({
+                    key: group.key,
+                    title: group.title,
+                    icon: group.icon,
+                    entries: members
+                });
+        }
+        const rest = sorted.filter(entry => !taken[entry.id]);
+        if (rest.length > 0)
+            list.push({
+                key: "other",
+                title: "Other",
+                icon: "applications-other-symbolic",
+                entries: rest
+            });
+        return list;
+    }
+
+    // Everything there is to choose between, in the order it is shown:
+    // [{ key, title, icon }]. The favourites, the applications by group,
+    // and last the two that are not applications.
+    readonly property var categories: [
+        {
+            key: "favorites",
+            title: "Favorites",
+            icon: "starred-symbolic"
+        }
+    ].concat(grouped.map(group => ({
+                key: group.key,
+                title: group.title,
+                icon: group.icon
+            }))).concat([
+        {
+            key: "places",
+            title: "Places",
+            icon: "folder-symbolic"
+        },
+        {
+            key: "session",
+            title: "Session",
+            icon: "system-shutdown-symbolic"
+        }
+    ])
+
+    // the session actions as rows; what ends the session asks first
+    readonly property var sessionRows: SessionActions.available.map(action => ({
+                kind: "session",
+                title: action.title,
+                subtitle: action.confirm ? "Asks for confirmation" : "",
+                icon: action.icon,
+                symbolic: true,
+                session: action
+            }))
+
+    function appResult(entry) {
+        return {
+            kind: "app",
+            title: entry.name,
+            subtitle: entry.comment || entry.genericName || "",
+            icon: entry.icon,
+            symbolic: false,
+            entry: entry
+        };
+    }
+
+    // what the panel lists while nothing is typed
+    readonly property var listing: {
+        if (category === "places")
+            return places;
+        if (category === "session")
+            return sessionRows;
+        const entries = category === "favorites" ? favoriteEntries : (grouped.find(group => group.key === category) ?? grouped[0]).entries;
+        return entries.map(appResult);
+    }
+
+    // ---- favourites ------------------------------------------------------
+
+    // Desktop entries by name, without ".desktop", in the order they are
+    // listed. Kept in ~/.config/kde-quickshell/launcher.json; without that
+    // file they start out as the favourites of KDE's own menu
+    // (launcher.sh), or, where that has none, as what is pinned to the dock.
+    property list<string> favorites: []
+
+    function isFavorite(id: string): bool {
+        return favorites.includes(id);
+    }
+
+    function toggleFavorite(id: string): void {
+        favorites = isFavorite(id) ? favorites.filter(other => other !== id) : favorites.concat([id]);
+        saveFavorites();
+    }
+
+    function saveFavorites(): void {
+        menuFile.setText(JSON.stringify({
+            favorites: favorites
+        }, null, 2) + "\n");
+    }
+
+    FileView {
+        id: menuFile
+
+        path: (Quickshell.env("XDG_CONFIG_HOME") || Quickshell.env("HOME") + "/.config") + "/kde-quickshell/launcher.json"
+        blockLoading: true
+        printErrors: false
+        onLoaded: {
+            try {
+                const stored = JSON.parse(text())?.favorites;
+                if (Array.isArray(stored))
+                    root.favorites = stored.filter(id => typeof id === "string");
+            } catch (error) {
+                console.warn("Launcher: ignoring unreadable", path, error);
+            }
+        }
+        onLoadFailed: error => {
+            if (error === FileViewError.FileNotFound)
+                firstFavorites.running = true;
+        }
+    }
+
+    Process {
+        id: firstFavorites
+
+        command: ["sh", Quickshell.shellPath("launcher.sh"), "favorites"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let found = text.split("\n").filter(id => id !== "");
+                if (found.length === 0)
+                    found = Pins.pinned.filter(address => address.startsWith("applications:")).map(address => address.slice(13).replace(/\.desktop$/, ""));
+                root.favorites = found;
+                root.saveFavorites();
+            }
+        }
+    }
+
+    // ---- places ----------------------------------------------------------
+
+    // The places of KDE's file manager, from the file it keeps them in:
+    // each a title, an address and an icon. Only what can be opened as it
+    // stands: a directory, the trash, the network; not the searches and
+    // timelines the file manager makes up itself.
+    property string placesText: ""
+    readonly property var places: {
+        const list = [];
+        const home = "file://" + Quickshell.env("HOME");
+        // (no `matchAll` in QML's JavaScript)
+        const bookmark = /<bookmark href="([^"]*)">([\s\S]*?)<\/bookmark>/g;
+        for (let found = bookmark.exec(placesText); found; found = bookmark.exec(placesText)) {
+            const url = found[1].replace(/&amp;/g, "&");
+            const body = found[2];
+            if (!/^(file|trash|remote|smb|sftp|fish|nfs|ftp):/.test(url) || /<IsHidden>true<\/IsHidden>/.test(body))
+                continue;
+            let path = url;
+            try {
+                path = decodeURIComponent(url.startsWith(home) ? "~" + url.slice(home.length) : url.replace(/^file:\/\//, ""));
+            } catch (error) {}
+            list.push({
+                kind: "place",
+                title: (/<title>([^<]*)<\/title>/.exec(body)?.[1] ?? "").replace(/&amp;/g, "&") || path,
+                subtitle: path,
+                icon: /<bookmark:icon name="([^"]*)"/.exec(body)?.[1] ?? "folder",
+                symbolic: false,
+                url: url
+            });
+        }
+        return list;
+    }
+
+    FileView {
+        path: (Quickshell.env("XDG_DATA_HOME") || Quickshell.env("HOME") + "/.local/share") + "/user-places.xbel"
+        blockLoading: true
+        printErrors: false
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: root.placesText = text()
+    }
 
     // ---- usage: how often and how recently each app was started here -----
 
@@ -288,17 +584,8 @@ Singleton {
         }
         ranked.sort((a, b) => b.score - a.score || a.app.fields.name.localeCompare(b.app.fields.name));
 
-        for (const item of ranked) {
-            const entry = item.app.entry;
-            list.push({
-                kind: "app",
-                title: entry.name,
-                subtitle: entry.comment || entry.genericName || "",
-                icon: entry.icon,
-                symbolic: false,
-                entry: entry
-            });
-        }
+        for (const item of ranked)
+            list.push(appResult(item.app.entry));
         return list;
     }
 
@@ -307,6 +594,13 @@ Singleton {
             return;
         if (result.kind === "app") {
             launch(result.entry);
+        } else if (result.kind === "place") {
+            Quickshell.execDetached(["xdg-open", result.url]);
+            LastWindow.expectWindow();
+            hide();
+        } else if (result.kind === "session") {
+            hide();
+            SessionActions.runWithPrompt(result.session);
         } else if (result.kind === "calc") {
             // wl-copy rather than Quickshell.clipboardText: setting that did not reach the clipboard here
             Quickshell.execDetached(["wl-copy", "--", result.value]);

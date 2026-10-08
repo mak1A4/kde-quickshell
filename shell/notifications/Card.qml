@@ -175,6 +175,7 @@ Rectangle {
     }
 
     MouseArea {
+        cursorShape: Qt.PointingHandCursor
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton | Qt.MiddleButton
         onClicked: mouse => {

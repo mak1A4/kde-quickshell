@@ -252,6 +252,7 @@ Item {
                 height: list.rowHeight
 
                 MouseArea {
+                    cursorShape: Qt.PointingHandCursor
                     anchors.fill: parent
                     hoverEnabled: true
                     // real pointer movement selects the row under it, see PickList
@@ -405,6 +406,7 @@ Item {
                                 MouseArea {
                                     id: buttonMouse
 
+                                    cursorShape: Qt.PointingHandCursor
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     // the footer then says what the button does

@@ -6,9 +6,9 @@ import qs
 // A small menu of the shell's own actions, opening above its anchor (the
 // dock is at the bottom). `actions` is a list of { text, icon, run }: a theme
 // icon's name or none, and what a click does. Toggle with `open`, not
-// `visible`. Closes on a click outside, on Escape, and after an action. Set
-// the actions before opening: a popup must not resize while it is mapped
-// (see MenuPopup.qml, the tray's menus).
+// `visible`. Closes on a click outside, on Escape, after an action, and when
+// another menu opens (Popouts.menu). Set the actions before opening: a popup
+// must not resize while it is mapped (see MenuPopup.qml, the tray's menus).
 PopupWindow {
     id: root
 
@@ -16,7 +16,8 @@ PopupWindow {
     property var actions: []
     property bool open: false
 
-    visible: open && actions.length > 0
+    visible: open && Popouts.menu === root && actions.length > 0
+    onOpenChanged: Popouts.menuToggled(root)
     onVisibleChanged: {
         if (!visible)
             open = false;
@@ -95,6 +96,7 @@ PopupWindow {
                 MouseArea {
                     id: mouse
 
+                    cursorShape: Qt.PointingHandCursor
                     anchors.fill: parent
                     hoverEnabled: true
                     onClicked: {

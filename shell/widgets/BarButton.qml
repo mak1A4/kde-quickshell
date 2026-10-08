@@ -10,6 +10,8 @@ Rectangle {
     default property alias content: column.data
     property bool highlighted: false
     property bool interactive: true
+    // a background while the pointer is on it
+    property bool hoverEffect: true
     // stays lit while something it opened (a popout) is showing
     property bool active: false
     readonly property bool hovered: hover.hovered
@@ -36,7 +38,7 @@ Rectangle {
     color: {
         if (highlighted)
             return Theme.accent;
-        if (active || (interactive && hovered))
+        if (active || (interactive && hoverEffect && hovered))
             return Theme.surfaceHover;
         return Theme.none;
     }
@@ -66,6 +68,7 @@ Rectangle {
     MouseArea {
         id: mouse
 
+        cursorShape: Qt.PointingHandCursor
         property real wheelAccumulator: 0
 
         anchors.fill: parent

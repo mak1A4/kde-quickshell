@@ -7,7 +7,8 @@ import qs
 // Shell-drawn menu for a QsMenuHandle (tray item menus, i.e. DBusMenu),
 // replacing the native Qt menu. It opens to the left of its anchor, as the bar
 // is on the right; submenus are further MenuPopups beside their entry.
-// Toggle with `open`, not `visible`. Closes on click outside or Escape.
+// Toggle with `open`, not `visible`. Closes on click outside or Escape, and
+// when another menu opens (Popouts.menu).
 PopupWindow {
     id: root
 
@@ -24,7 +25,11 @@ PopupWindow {
     // Entries arrive asynchronously. Mapping only once they are here keeps the
     // popup from resizing while mapped, which at fractional scale leaves a
     // stale, stretched frame (Quickshell 0.3.1 / Qt 6.11).
-    visible: open && opener.children.values.length > 0
+    visible: open && (submenu || Popouts.menu === root) && opener.children.values.length > 0
+    onOpenChanged: {
+        if (!submenu)
+            Popouts.menuToggled(root);
+    }
     onVisibleChanged: {
         if (visible)
             return;
@@ -178,6 +183,7 @@ PopupWindow {
                 MouseArea {
                     id: mouse
 
+                    cursorShape: Qt.PointingHandCursor
                     anchors.fill: parent
                     enabled: !entry.separator && entry.modelData.enabled
                     hoverEnabled: true

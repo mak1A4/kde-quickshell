@@ -14,6 +14,8 @@
 #                 application asks whether it is dark or light. The icon
 #                 theme follows if it comes as a -Dark and -Light pair.
 #   Look.qml      the shell's lock screen
+#   gtk4          ~/.config/gtk-4.0/kde-quickshell.css: libadwaita's colour
+#                 names, for the GTK applications KDE's colours do not reach
 #   ghostty.conf  \
 #   wezterm.lua    | in the directory of colors.json: the terminals, tmux and
 #   tmux.conf      | Neovim, each of which is pointed at its file once, in
@@ -92,6 +94,22 @@ if [ -z "$quiet" ]; then
     esac
     if [ "$wanted" != "$icons" ] && { [ -d "/usr/share/icons/$wanted" ] || [ -d "$data/icons/$wanted" ]; }; then
         /usr/lib/plasma-changeicons "$wanted" > /dev/null 2>&1 || true
+    fi
+fi
+
+# ---- GTK ------------------------------------------------------------------
+
+# GTK applications have KDE's colours from KDE itself, which gives them to its
+# Breeze theme for GTK (~/.config/gtk-4.0/colors.css is its). All but the ones
+# made with libadwaita, which take no theme: for those, libadwaita's own
+# colour names, in a file of ours that the user's style sheet imports. KDE
+# rewrites that style sheet at a change of colour scheme and keeps what it
+# finds there; the line is looked for each time all the same. An application
+# reads it when it starts.
+if [ -d "$config/gtk-4.0" ] || command -v gtk4-launch > /dev/null 2>&1; then
+    render gtk4.css.tpl "$config/gtk-4.0/kde-quickshell.css" || true
+    if ! grep -qsF "@import 'kde-quickshell.css';" "$config/gtk-4.0/gtk.css"; then
+        printf "\n@import 'kde-quickshell.css';\n" >> "$config/gtk-4.0/gtk.css"
     fi
 fi
 

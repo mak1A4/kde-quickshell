@@ -44,7 +44,7 @@ BarButton {
     Icon {
         Layout.alignment: Qt.AlignHCenter
         module: "network"
-        color: !root.available ? Theme.error : (root.limited ? Theme.warning : Theme.fg)
+        color: !root.available ? Theme.error : (root.limited ? Theme.warning : Theme.hue("network"))
         source: {
             if (!root.available)
                 return "network-offline-symbolic";

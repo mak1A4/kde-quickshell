@@ -41,6 +41,12 @@ Singleton {
         // reads as a separate thing floating over it
         colors.tooltipBg = given.tooltipBg ?? colors.accent;
         colors.tooltipFg = given.tooltipFg ?? colors.accentFg;
+        // The six colours the bar's icons are drawn in: the theme's own red,
+        // green, yellow, blue, magenta and cyan, which are its terminal's.
+        // Those are made for text on the terminal's background and can be
+        // faint as a small icon on the frame: each is taken towards the
+        // text's colour until it stands out enough.
+        colors.hues = colors.terminal.slice(1, 7).map(hue => legible(hue, colors.bg, colors.fg));
         if (given.bg) {
             colors.view = given.view ?? given.bg;
             colors.terminalBackground = given.terminalBackground ?? given.bg;
@@ -49,6 +55,29 @@ Singleton {
             colors.terminalSelection = given.terminalSelection ?? colors.surfaceActive;
         }
         return colors;
+    }
+
+    // how bright a colour is, 0 to 1, and how far two are apart (WCAG)
+    function luminance(colour: color): real {
+        const linear = channel => channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
+        return 0.2126 * linear(colour.r) + 0.7152 * linear(colour.g) + 0.0722 * linear(colour.b);
+    }
+
+    function contrast(a: color, b: color): real {
+        const [high, low] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+        return (high + 0.05) / (low + 0.05);
+    }
+
+    // `colour`, or as little of `towards` mixed into it as makes it stand
+    // out from `on` three to one; at most half
+    function legible(colour: color, on: color, towards: color): color {
+        let found = colour;
+        for (let share = 0; share <= 0.5; share += 0.1) {
+            found = Qt.tint(colour, Qt.alpha(towards, share));
+            if (contrast(found, on) >= 3)
+                break;
+        }
+        return found;
     }
 
     // the theme that is in use, which everything outside the shell has too
@@ -73,7 +102,8 @@ Singleton {
 
     function shown(): var {
         const colors = {
-            desktops: [...desktopColors]
+            desktops: [...desktopColors],
+            hues: [...hues]
         };
         for (const key of drawn)
             colors[key] = mix(from[key], to[key]);
@@ -128,6 +158,35 @@ Singleton {
     readonly property color none: Qt.alpha(surfaceHover, 0)
     // one per virtual desktop, by position, repeating
     readonly property list<color> desktopColors: to.desktops.map((color, i) => mix(from.desktops[i % from.desktops.length], color))
+
+    // red, green, yellow, blue, magenta, cyan: see `resolved`
+    readonly property list<color> hues: to.hues.map((color, i) => mix(from.hues[i], color))
+    // Which of them the icon of each of the bar's modules has. Power is not
+    // the accent's colour in any theme: its icon turns to the accent while
+    // sleep is blocked. Network is neither red nor yellow, which say that
+    // something is wrong with it.
+    readonly property var moduleHues: ({
+            session: 0,
+            audio: 1,
+            power: 2,
+            network: 3,
+            media: 4,
+            connect: 5
+        })
+
+    // the colour of a module's icon in the bar
+    function hue(module: string): color {
+        return hues[moduleHues[module] ?? -1] ?? fg;
+    }
+
+    // one of the six for anything with a name, always the same one: an
+    // item in the tray
+    function hueOf(name: string): color {
+        let sum = 0;
+        for (let i = 0; i < name.length; i++)
+            sum = (sum * 31 + name.charCodeAt(i)) % 9973;
+        return hues[sum % hues.length];
+    }
 
     // Sizes are multiples of 3 logical px: whole device pixels at scale 1.333
     readonly property int frameBorder: 9

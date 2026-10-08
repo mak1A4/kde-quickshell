@@ -23,5 +23,6 @@ Kirigami.Icon {
     implicitWidth: Theme.iconSize
     implicitHeight: Theme.iconSize
     isMask: colorize
-    color: Theme.fg
+    // one of the bar's modules has a colour of its own
+    color: module !== "" ? Theme.hue(module) : Theme.fg
 }

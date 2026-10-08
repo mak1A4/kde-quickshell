@@ -65,7 +65,7 @@ BarButton {
         Layout.alignment: Qt.AlignHCenter
         module: "power"
         // accent while sleep and screen locking are manually blocked
-        color: inhibitionControl.isManuallyInhibited ? Theme.accent : Theme.fg
+        color: inhibitionControl.isManuallyInhibited ? Theme.accent : Theme.hue("power")
         source: {
             if (root.hasBattery) {
                 const level = String(Math.round(batteryModel.percent / 10) * 10).padStart(3, "0");

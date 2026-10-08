@@ -8,6 +8,10 @@ import QtQuick
 //
 // Also which item is hovered for a hint. Such an item has `hintTitle` (string)
 // and `hintLines` (list of strings) and reports its hover state via hover().
+//
+// And which context menu is open (widgets/MenuPopup.qml, ActionMenu.qml).
+// These are windows of their own, and there is one at a time: a menu shows
+// only while it is `menu`, and another that opens takes its place.
 Singleton {
     id: root
 
@@ -15,6 +19,8 @@ Singleton {
     property Item anchorItem: null
     property Component content: null
     property Item hintItem: null
+    property QtObject menu: null
+    readonly property bool menuOpen: menu?.visible ?? false
 
     function hover(item: Item, hovered: bool) {
         if (hovered)
@@ -45,5 +51,25 @@ Singleton {
         if (current !== "")
             closing(root.anchorItem, false);
         current = "";
+    }
+
+    // A menu calls this when its `open` changes. The one that was open is
+    // closed before the new one is `menu`, so before the new one is mapped:
+    // two such popups side by side are not allowed (the second would be made
+    // a child of the first).
+    function menuToggled(item: QtObject) {
+        if (!item.open) {
+            if (menu === item)
+                menu = null;
+            return;
+        }
+        if (menu && menu !== item)
+            menu.open = false;
+        menu = item;
+    }
+
+    function closeMenu() {
+        if (menu)
+            menu.open = false;
     }
 }

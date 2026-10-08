@@ -291,6 +291,41 @@ if have code; then
     fi
 fi
 
+# ---- holidays in the calendar ----------------------------------------------
+
+# The clock's calendar has its holidays from Plasma's plugin, which without a
+# choice of regions takes the country of the language: for someone who reads
+# English and lives in Austria, the United States'. The country the dates
+# are formatted for is the better guess, and is written down once, in
+# Plasma's own file, where Plasma's calendar has its choice too.
+regions=$(kreadconfig6 --file plasma_calendar_holiday_regions --group General --key selectedRegions 2> /dev/null)
+if [ -n "$regions" ]; then
+    say ok holidays "Holidays in the calendar" "those of $regions"
+else
+    format=${LC_ALL:-${LC_TIME:-${LANG:-}}}
+    format=${format%%.*}
+    language=${format%%_*}
+    country=$(printf '%s' "${format#*_}" | tr '[:upper:]' '[:lower:]')
+    # which sets there are, only the library can say: asked through a
+    # few lines of QML (holiday-regions.qml)
+    known=$(timeout 10 qs -p "$shell/holiday-regions.qml" 2>&1 | grep -o 'REGION [a-z_-]*' | cut -d' ' -f2)
+    region=
+    if [ "$format" != "$language" ]; then
+        for candidate in "${country}_${language}" "$country" "$(printf '%s\n' "$known" | grep -m1 "^${country}_")"; do
+            if [ -n "$candidate" ] && printf '%s\n' "$known" | grep -qx "$candidate"; then
+                region=$candidate
+                break
+            fi
+        done
+    fi
+    if [ -n "$region" ]; then
+        kwriteconfig6 --file plasma_calendar_holiday_regions --group General --key selectedRegions "$region"
+        say fixed holidays "Holidays in the calendar" "those of $region, as the dates are formatted for $format (selectedRegions in ~/.config/plasma_calendar_holiday_regions says which)"
+    else
+        say note holidays "Holidays in the calendar" "no set of holidays found for ${format:-the system's date format}${known:+ among KDE's}; the language's country's are shown"
+    fi
+fi
+
 # ---- backgrounds -----------------------------------------------------------
 
 count=$(find "$config/kde-quickshell/themes/backgrounds" -mindepth 2 -maxdepth 2 -type f 2> /dev/null | wc -l)

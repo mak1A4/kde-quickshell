@@ -287,6 +287,7 @@ Item {
 
                     // under the buttons: a click anywhere else on the header
                     MouseArea {
+                        cursorShape: Qt.PointingHandCursor
                         anchors.fill: parent
                         z: -1
                         onClicked: group.expanded = !group.expanded

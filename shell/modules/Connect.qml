@@ -101,7 +101,7 @@ BarButton {
         Layout.alignment: Qt.AlignHCenter
         module: "connect"
         source: "smartphone-symbolic"
-        color: root.anyConnected ? Theme.fg : Theme.fgDim
+        color: root.anyConnected ? Theme.hue("connect") : Theme.fgDim
         opacity: root.anyConnected ? 1 : 0.6
     }
 }

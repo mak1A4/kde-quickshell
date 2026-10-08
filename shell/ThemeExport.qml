@@ -135,6 +135,8 @@ Singleton {
             values[name + "_rgb"] = channels(colour).join(",");
             values[name + "_strip"] = colour.slice(1);
         }
+        // the dark edge libadwaita draws where one surface lies on another
+        values.shade = dark ? "rgba(0, 0, 0, 0.36)" : "rgba(0, 0, 0, 0.12)";
         // for the browsers' policy: the colour of the frame, or none
         values.browserColour = Themes.browsers === "system" ? "off" : values.bg_strip;
         for (const name of ["frameBorder", "frameRounding", "panelRounding", "panelSmoothing", "shadowOpacity", "radius", "spacing", "padding", "fontSize", "fontSizeSmall", "iconSize", "moveDuration", "fadeDuration"])

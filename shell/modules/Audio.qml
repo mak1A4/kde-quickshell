@@ -54,7 +54,7 @@ BarButton {
     Icon {
         Layout.alignment: Qt.AlignHCenter
         module: "audio"
-        color: root.available ? Theme.fg : Theme.error
+        color: root.available ? Theme.hue("audio") : Theme.error
         source: {
             if (!root.available || root.muted || root.volume === 0)
                 return "audio-volume-muted-symbolic";

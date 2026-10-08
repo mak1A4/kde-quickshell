@@ -24,6 +24,23 @@ windows could not blend into the border.
   the frame and dismisses it. No compositor grab is involved.
 - **Dock:** hidden; the bottom border strip is the hover sensor (it is always in the
   input region), and the panel keeps itself open while hovered, with a 300 ms grace.
+- **The bar's icons are in the theme's colours** (2026-10-07), not all in the text's:
+  the theme's own red, green, yellow, blue, magenta and cyan, which are its terminal's
+  (`Theme.hues`). Each module has one (`Theme.moduleHues`: session red, volume green,
+  power yellow, network blue, media magenta, KDE Connect cyan), and a one-colour icon
+  in the tray has one by its item's name, always the same. What an icon's colour said
+  before it still says: the network's is red or yellow when something is wrong, which
+  is why its own is blue; power's is the accent while sleep is blocked, which is why
+  its own is yellow, the accent of no theme; KDE Connect's is dim with no device. A
+  terminal's colours are made for text on the terminal's background, and several are
+  faint as an 18 px icon on the frame (Everforest Light's yellow on cream): each is
+  taken towards the text's colour, a tenth at a time and at most half, until it stands
+  out three to one. The hidden-icons arrow, the clock and the dock are as they were.
+- **The pointer** is the pointing hand over anything a click does something on, as in a
+  web page (2026-10-07): every `MouseArea` with an `onClicked` has
+  `cursorShape: Qt.PointingHandCursor`. Not the ones that only stop clicks from going
+  through, and not sliders. The clock has only this: no background under the pointer
+  and none while its calendar is open (`BarButton.hoverEffect`).
 - **Hints:** anything hoverable exposes `hintTitle` / `hintLines` and reports hover to
   `Popouts.hover()`. The frame shows the hint as a small panel sliding out of the bar, or
   as a bubble above the dock for window icons. Hints are outside the input region and
@@ -120,6 +137,99 @@ timing carried over.
 - **Hints** wait `Theme.hintDelay` (400 ms; Noctalia uses 500) before first appearing,
   then switch immediately between items.
 
+## Clock: a binary clock, and a calendar
+
+The clock in the bar is a binary clock (2026-10-07, `modules/clock/BinaryTime.qml`):
+two columns of dots (since 2026-10-08), the hour of 24 on the left and the minutes on
+the right, each one binary number: the lowest dot worth 1, then 2, 4, 8, 16 and 32, lit
+where the number has that bit. A column is only as high as its number can need (five
+dots for the hour, six for the minutes). Dots are 9 px with 3 between, the columns 6
+apart: 24 wide and 69 high, in a cell as wide as any other. The hour's dots are lit in
+the text's colour, the minutes' in the accent; an unlit dot is smaller and faint. The
+time in figures is the first line of the hint.
+
+- **Before, four columns**, one for each digit of `HH mm` (2, 4, 3 and 4 dots of 6 px,
+  36 wide in a cell made 42 wide for it): in a bar of 48 the dots had to be small. Two
+  columns leave room for dots half as large again, and the bar has the height. The
+  price is the reading: a column is a number up to 59 to add up, not a digit up to 9.
+
+- **Flat dots** (2026-10-08, to be looked at; the user was not sure of the liquid ones
+  any more): drawn as the workspace switcher draws its dots (`modules/clock/Dots.qml`),
+  a lit one solid at 9 px, an unlit one 6 px and faint in its column's colour. What
+  moves: a dot coming on swells past its size and settles, and a wave goes up a column
+  (each dot in turn swells to 1.3 and settles, 45 ms after the one below) when its
+  number changes, so the minutes' once a minute, and up both when the pointer comes
+  onto the clock, which has no background to light. Nothing runs between these. Not
+  seen in motion: pictures taken around a minute's change were all of the minute
+  before. `BinaryTime.liquid: true` brings the shader's
+  dots back, which are described next; while it is false the shader is not loaded and
+  its clock does not run.
+
+The liquid dots are one drawing, by a shader (`shaders/binary.frag`): lit dots are a liquid
+shape, made with the smooth minimum the frame is drawn with, so two that are lit next
+to each other (in a column, or in a pair's row) join with a thin neck, and the dots
+stay to be seen as its bulges. They breathe, each a little out of step, the necks
+swell and ebb, there is a faint glow around them, and a dot coming on swells past its
+size, settles, and sends out one ring. QML gives the shader two `vector4d` for each
+column (a vector has room for four dots), how far each of its dots is lit, animated with a `PropertyAnimation` (which
+can move a vector; `NumberAnimation` cannot), and a time that a `Timer` counts up 20
+times a second: slow movement needs no more, and each step draws the whole frame's
+surface again. The time runs at 0.4 of the clock's (`BinaryTime.speed`): a breath
+takes ten seconds. At the shader's own pace, four seconds, it was restless. The count wraps at 2000 π, where every wave in the shader is at a
+whole turn. Tried before it and taken out again the same
+night: the time on a slant, `01 / 04`, hour above left, minutes below right, a slash
+between.
+
+A click opens the calendar as a popout (`modules/clock/CalendarPanel.qml`):
+
+- **Top:** the time in figures, large, with the day, the date and the week.
+- **The month** is the shell's own grid, in JavaScript: six weeks, week numbers (ISO),
+  today as a disc in the accent, the picked day as a grey one, days of the months
+  before and after faint, weekends dim. Arrows, the wheel, a click on the month's name
+  or "Today" (there only while somewhere else) turn it; it slides in from the side it
+  came from. A click on a faint day goes to its month.
+- **Below:** the picked day and what is on it, with how far away it is.
+- **Names and order** are the system's date format (`LC_TIME`): German names of days
+  and months and Monday first here, next to the shell's English words. Plasma's own
+  calendar mixes the same way.
+- **Holidays and events** come from Plasma's calendar plugins, through the backend its
+  own calendar uses (`org.kde.plasma.workspace.calendar`: `Calendar`, `DaysModel`,
+  `EventPluginsManager` with `holidaysevents` and `pimevents`). `Events.qml` holds
+  that and is loaded with a `Loader`: without the module the calendar is a calendar
+  without them. The grid does not use Plasma's `MonthView`, which is Plasma's look. A
+  day with a holiday has its number in red, one with an event a dot. What counts as a
+  holiday is the plugin's word (`eventType`, which is a translated word: "Holidays" in
+  English; in another language holidays would be listed as events), and which of them
+  is a day off is KDE's data: for Austria it marks 10 October as one.
+- **Which country's holidays.** The plugin, left alone, takes the country of the
+  language: the United States' for English spoken in Austria. `setup.sh` writes the
+  region once, into Plasma's own `~/.config/plasma_calendar_holiday_regions`, from the
+  country the dates are formatted for (`de_AT` gives `at_de`), if nothing is chosen
+  there. Which regions exist only KDE's holiday library can say, and it can only be
+  asked from a program: `holiday-regions.qml`, a few lines run once with `qs -p`,
+  prints them. It waits 400 ms before ending: Quickshell writes its log from another
+  thread, and a program that ends at once loses lines (it did, once in eight).
+- `qs ipc call clock toggle` opens and closes it; while open, `calendar pick
+  2026-12-25` goes to a day and `calendar events` says what is on it.
+- **A trap:** an inline component cannot be declared inside another one ("Nested
+  inline components are not supported"). The shell had been restarted to pick up the
+  new directory, and a restart with a file that does not load leaves no shell at all,
+  where a reload would have kept the old one: reload first.
+
+Tested on this machine, from pictures of the clock and of the popout alone: the clock
+in the bar (01:18 as dots, before the shader); the shader's clock five times enlarged
+in a hidden compositor, with a stand-in for `Theme` (13:57, 13:59, 20:48, 07:07: the
+right dots lit and joined, and two pictures a moment apart not the same), since the
+screen was locked by then; the two columns from a picture of the bar (12:47: 4 and 8 lit on the left;
+1, 2, 4, 8 and 32 on the right, the four joined); the popout on today's month, on December (week 53 and then 1, which is
+right for 2026) and on a picked day; the Austrian holidays after `setup.sh` had chosen
+the region (Nationalfeiertag, Maria Empfängnis; none on 4 July), the American ones
+before; `setup.sh` for `de_AT`, `en_US`, `fr_CH`, a made-up country and `C` against
+scratch directories. Not tested: a click or the wheel (the month was turned through
+IPC, which runs the same functions), a dot changing and the slide of the month in
+motion, the popout's top since the time there is in plain figures, midnight, an event from a PIM calendar (none is installed), the
+calendar without Plasma's module.
+
 ## Session menu
 
 A power button at the bottom of the bar opens a popout with lock, sleep, hibernate, log
@@ -143,9 +253,57 @@ Popouts may now be narrower than `Theme.popupWidth`; the frame takes the content
 
 Opened from the first button in the dock, or with `qs ipc -p <config> call launcher
 toggle` (also `open`, `close`). The dock panel itself grows into the launcher, so it is
-the same blob changing size, not a second panel. Inspiration: Caelestia's launcher (short
-result list over a search field, `>` for actions, calculator) and Noctalia's usage
-tracking.
+the same blob changing size, not a second panel. It began after Caelestia's launcher (a
+short result list over a search field) and has since 2026-10-07 what KDE's own menu
+has, in the shell's own layout; `>` for actions, the calculator and Noctalia's usage
+tracking are as they were.
+
+- **Layout** (`launcher/LauncherPanel.qml`, 570 by 501, a fixed size: it no longer
+  grows and shrinks as one types). On the left a rail of icons, as the bar is one on
+  the right: favourites, all applications, each category, the places, the session.
+  Beside it the name of the chosen one with how many are in it, and its list, eight
+  rows with a description under each name. Below both the search field, where the dock
+  was. Typing replaces rail and list by the results. The session's actions are rows
+  like any others, and "Shell settings" is among the `>` actions.
+- **First laid out as KDE's menu is** (the user and the search on top, the categories
+  as a list of names, a row of tabs and session buttons at the bottom, thin lines
+  between): everything worked and it was KDE's menu in other colours. Taken back the
+  same day; what it could do was kept.
+- **Categories** are worked out here, from the categories a desktop entry names
+  (Quickshell gives them): freedesktop's main categories under the names KDE's menu
+  has for them (`Network` is Internet, `AudioVideo` Multimedia, `Utility` Utilities,
+  `Settings` goes with System, `Science` with Education). An application is in every
+  one it names; what names none is in "Other"; a category with nothing in it is not
+  listed. Not KDE's menu itself (its private `kicker` models), which would bring the
+  menu editor's changes too: those models want a Plasma applet around them, and a
+  crash in them would be the shell's.
+- **Favourites** are the launcher's own list, `~/.config/kde-quickshell/launcher.json`,
+  desktop entries by name. Without the file it starts out as the favourites of KDE's
+  menu, in their order (`launcher.sh favorites`: KDE keeps them in a database, but
+  their order is in `kactivitymanagerd-statsrc`; `preferred://browser` is the default
+  browser), or, where KDE has none, as what is pinned to the dock. From then on it is
+  the launcher's, changed from an application's menu or with Ctrl+D.
+- **An application's menu** (right click, the Menu key or Shift+F10): Open, the
+  actions the application offers itself (a new window, a private one, System
+  Settings' pages), favourite or not, pinned to the dock or not. It is drawn in the
+  launcher's own panel, over the lists, and not a popup window as the dock's menus
+  are: the launcher holds the keyboard exclusively, and a window of its own would have
+  to take it and give it back. Up, Down and Enter are the menu's while it is open,
+  Escape closes it and leaves the launcher, a click elsewhere closes it and does
+  nothing else. Before it there was a star at the end of a row: on the chosen row it
+  went along with the arrow keys, there and gone at each step; on the pointer's row
+  alone it was still one more thing in every list.
+- **Places** are those of KDE's file manager, read from the file it keeps them in
+  (`user-places.xbel`), opened with `xdg-open`. Of KDE's "History" and "Frequently
+  Used" there is nothing: a list of the files last opened, shown each time the menu
+  opens, is not everyone's wish.
+- **Keys:** the search field always has them. Up and Down move in the list, or, after
+  Left or Tab, in the rail, where each move shows that category; Right or Tab goes
+  back. Left and Right mean that only while nothing is typed. With the pointer, an
+  icon of the rail is clicked: pointing at it showed its list at first, as KDE's menu
+  does, and the list changed with every icon the pointer crossed.
+- **The session's rows** go through KDE's own confirmation screen where they end the
+  session, as the `>` actions do.
 
 - **The content stands still while the panel grows.** The panel is centred on the screen
   and its width is animated, overshooting a little before it settles; the content is
@@ -162,8 +320,10 @@ tracking.
   `timeout 5`; on failure the entry is started by Quickshell directly.
 - **Ranking:** own scorer in `launcher/search.js` (exact, prefix, word start, initials,
   substring, letters in order; name counts most, then generic name, keywords, id,
-  comment). With no query the list is ordered by use: launch count halved per two weeks
-  since the last launch, stored in Quickshell's state dir (`launcher-usage.json`).
+  comment), with a little added for applications in regular use: launch count halved
+  per two weeks since the last launch, stored in Quickshell's state dir
+  (`launcher-usage.json`). (Before the menu, the list with no query was ordered by
+  that use alone.)
 - **Calculator:** `=` prefix, or plain arithmetic. `launcher/calc.js` is a hand-written
   parser, not `eval`. Enter copies the result with `wl-copy`; `Quickshell.clipboardText`
   did not reach the clipboard when tested.
@@ -174,6 +334,16 @@ tracking.
   closes so a click outside dismisses it, as for popouts.
 - **IPC naming:** functions must not be called `show`; `qs ipc` has a `show` subcommand
   and lists the function instead of calling it.
+
+Tested for the menu (2026-10-07), on this machine, from pictures of the panel alone:
+the favourites (the eleven of KDE's menu, in its order), a category, the session;
+"dolph" typed with the test keyboard and its results; a favourite added and taken out
+again through IPC, the file as before afterwards; and, in the first layout, whose key
+handling this one has: Left and three times Down, which chose Education, then Right
+and Down, which chose its application; the menu of the second favourite opened with
+Shift+F10, two steps down in it, Escape, after which the launcher was still open. Not
+tested: any click (a row, the right button, an entry of the menu, an icon of the
+rail), Ctrl+D, opening a place, a session row, pinning from the menu.
 
 To open it with a key: System Settings > Keyboard > Shortcuts > Add New > Command, with
 `qs ipc -p /path/to/shell call launcher toggle`. The Meta key alone is wired by KWin to
@@ -1019,6 +1189,22 @@ read again.
 - **btop:** `~/.config/btop/themes/kde-quickshell.theme` is the theme btop ships of the
   same name where it has one (`apps.btop`), else a template filled in; `btop.conf` names
   that one theme, and a running btop reads it again at `SIGUSR2`.
+- **Ghostty's tab bar** is GTK's (libadwaita), which knows light and dark and no
+  colour scheme: white over a cream terminal. Ghostty has its own way round that, and
+  the generated file uses it (2026-10-07): `window-theme = ghostty`, with
+  `window-titlebar-background` and `-foreground` set to the frame's `bg` and `fg`, which
+  are also KDE's title bar's: the tab bar continues the title bar. Nothing of GTK's is
+  themed for this.
+- **GTK applications.** Most have the theme through KDE, which gives its colour scheme
+  to its Breeze theme for GTK 3 and 4 (`~/.config/gtk-4.0/colors.css`, with Breeze's
+  colour names). Not the ones made with libadwaita (here zenity and Faugus Launcher):
+  they take no theme, only light or dark, and stayed neutral grey. They do take
+  libadwaita's own colour names from the user's style sheet, so `apply.sh` writes
+  those (`themed/gtk4.css.tpl` to `~/.config/gtk-4.0/kde-quickshell.css`: window, view,
+  header bar, sidebar, card, dialog, popover, accent and the signal colours) and adds
+  one `@import` to `~/.config/gtk-4.0/gtk.css`, which is KDE's file: KDE rewrites it at
+  a change of colour scheme and keeps what else is in it. An application reads the
+  colours when it starts.
 - **VS Code:** the theme's own colour theme by the name VS Code lists it under
   (`apps.vscode`), written into `settings.json` as `workbench.colorTheme` and as both the
   preferred dark and light one: with "follow the system" on, VS Code takes one of those
@@ -1074,7 +1260,11 @@ theme; a screenshot with `everforest`. Headless: theme changes with backgrounds 
 scratch directories, the list after a change of theme, a stored choice of background, a
 file added to the directory. Not tested: WezTerm on screen (it was not running; its
 configuration loads), a GTK or Electron application on screen, `tools/qylock.sh`
-fetching, Enter on "Background: ..." in the palette. For btop, VS Code and the browsers:
+fetching, Enter on "Background: ..." in the palette. For libadwaita (2026-10-07), in a
+hidden compositor with the user's configuration: Faugus Launcher grey-white (`#fafafb`)
+under a cream title bar before, the title bar's `#fdf6e3` after, and `#1a1b26` with
+`tokyo-night`, chosen for the moment of the picture; `gtk.css` with both imports after
+KDE had rewritten it twice; Ghostty's tab bar before and after. For btop, VS Code and the browsers:
 `tokyo-night` and `everforest` chosen, and each time the policy file (written without a
 question for the password), the name in VS Code's settings and btop's theme file read;
 Helium's toolbar seen to lose its green; every theme's VS Code name checked against the
@@ -1150,7 +1340,7 @@ seconds after the start (2026-10-06).
   the lock screen's package and the drop-in that names it for KWin (what
   `tools/lockscreen.sh` did by hand; that tool is gone); VS Code's extensions for the
   themes, asked for once and again when the list changes, since asking VS Code takes a
-  second or two.
+  second or two; the country whose holidays the calendar shows (see "Clock").
 - **What it only says:** programs that are not installed; a package of ours in
   `~/.local/share/plasma` whose files are links (Plasma refuses those: the black
   desktop after a reboot, when a dotfiles manager had linked them); `ShellPackage` named
@@ -1419,6 +1609,24 @@ nothing else needed.
 - Entry icons arrive as pixmaps rendered by the app for its own palette, so a dark-on-light
   icon stays dark on our dark menu. Not recoloured: they may be full-colour.
 - Mouse only; no keyboard navigation yet.
+- **One menu at a time** (2026-10-08), the tray's and the dock's (`ActionMenu`) alike:
+  `Popouts.menu` is the one that is open, a menu is mapped only while it is that one,
+  and one that opens closes the other first. Before, a right click on a second tray
+  icon opened its menu with the first still there: a press on the frame that an icon
+  accepts does not dismiss a grabbing popup (only a press nothing accepts does, or one
+  on another program), and Qt made the second popup a child of the first ("does not
+  match the current topmost grabbing popup" in the log), with both icons lit.
+- **Nothing on the frame is hovered while a menu is open:** a `MouseArea` over the whole
+  frame takes the hovering then, so no icon lights up and no hint comes out. A press
+  on it closes the menu and is passed on (`mouse.accepted = false`), so a right click
+  on another icon opens that one's menu and a left click does what it always does.
+  The icon the menu belongs to is left to close it itself. An icon under the pointer
+  when the overlay comes or goes keeps its state until the pointer next moves.
+- Tested 2026-10-08 without the pointer (the user was working): the real `ActionMenu`
+  and `MenuPopup` (with the menus of two running tray items) in a scratch config drawn
+  off screen, opened over one another in every order, the first always hidden before
+  the second showed; the overlay's hover and press behaviour in a `qmltestrunner` case
+  of its own. Not tested: real clicks on the bar.
 
 ## Quickshell service singletons are lazy
 

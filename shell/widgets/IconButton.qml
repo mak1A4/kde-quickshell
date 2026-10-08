@@ -28,6 +28,7 @@ Rectangle {
     MouseArea {
         id: mouse
 
+        cursorShape: Qt.PointingHandCursor
         anchors.fill: parent
         hoverEnabled: true
         onClicked: root.clicked()

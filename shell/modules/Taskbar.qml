@@ -325,6 +325,7 @@ RowLayout {
             MouseArea {
                 id: mouse
 
+                cursorShape: Qt.PointingHandCursor
                 anchors.fill: parent
                 hoverEnabled: true
                 acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton

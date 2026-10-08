@@ -20,8 +20,8 @@ PanelWindow {
 
     // Hovered item with a hint. A hint waits Theme.hintDelay before it first
     // appears; once one is showing, moving to another item switches at once.
-    // Hints yield to an open popout.
-    readonly property Item wantedHint: !modal && (Popouts.hintItem?.hintTitle ?? "") !== "" ? Popouts.hintItem : null
+    // Hints yield to an open popout, and to an open menu.
+    readonly property Item wantedHint: !modal && !Popouts.menuOpen && (Popouts.hintItem?.hintTitle ?? "") !== "" ? Popouts.hintItem : null
     property Item shownHint: null
     readonly property Item barHint: within(shownHint, bar) ? shownHint : null
     readonly property Item dockHintItem: within(shownHint, dock) ? shownHint : null
@@ -355,6 +355,7 @@ PanelWindow {
 
     // the filled corner is the button
     MouseArea {
+        cursorShape: Qt.PointingHandCursor
         x: Theme.frameBorder
         y: root.height - Theme.frameBorder - height
         width: notificationCorner.button
@@ -367,6 +368,7 @@ PanelWindow {
     // Without notifications the corner is like the others: the corner of
     // the border itself opens the (empty) list.
     MouseArea {
+        cursorShape: Qt.PointingHandCursor
         x: 0
         y: root.height - 45
         width: Theme.frameBorder
@@ -377,6 +379,7 @@ PanelWindow {
     }
 
     MouseArea {
+        cursorShape: Qt.PointingHandCursor
         x: 0
         y: root.height - Theme.frameBorder
         width: 45
@@ -619,5 +622,25 @@ PanelWindow {
             right: parent.right
         }
         width: Theme.barWidth
+    }
+
+    // While a menu is open (a window of its own, see widgets/MenuPopup.qml)
+    // nothing on the frame answers the pointer being on it: this is over
+    // everything and takes the hovering. A press closes the menu and goes on
+    // to what is under it, so a right click on another icon opens that one's
+    // menu. Not a press on the icon the menu belongs to: that icon closes it.
+    MouseArea {
+        anchors.fill: parent
+        enabled: Popouts.menuOpen
+        hoverEnabled: true
+        acceptedButtons: Qt.AllButtons
+        onPressed: mouse => {
+            const owner = Popouts.menu?.anchorItem ?? null;
+            // an icon of another screen's frame is not under this press
+            const here = root.within(owner, bar) || root.within(owner, dock);
+            if (!here || !owner.contains(mapToItem(owner, mouse.x, mouse.y)))
+                Popouts.closeMenu();
+            mouse.accepted = false;
+        }
     }
 }

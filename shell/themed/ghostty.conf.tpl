@@ -21,3 +21,8 @@ cursor-color = {{ terminalCursor }}
 cursor-text = {{ terminalBackground }}
 selection-background = {{ terminalSelection }}
 selection-foreground = {{ terminalForeground }}
+# The window around the terminal, which is GTK's and would be white or black:
+# the tab bar in the colour of KDE's title bar above it, as one piece.
+window-theme = ghostty
+window-titlebar-background = {{ bg }}
+window-titlebar-foreground = {{ fg }}

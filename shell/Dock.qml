@@ -174,6 +174,7 @@ Item {
                     }
 
                     MouseArea {
+                        cursorShape: Qt.PointingHandCursor
                         anchors.fill: parent
                         onClicked: Launcher.show(root.screen)
                     }
@@ -221,7 +222,7 @@ Item {
             QtObject {
                 id: launcher
 
-                readonly property real implicitWidth: launcherLoader.item?.implicitWidth ?? 540
+                readonly property real implicitWidth: launcherLoader.item?.implicitWidth ?? 570
                 readonly property real implicitHeight: launcherLoader.item?.implicitHeight ?? Theme.dockHeight
             }
         }
