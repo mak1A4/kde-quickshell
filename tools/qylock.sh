@@ -65,6 +65,8 @@ echo "$list" | while read -r theme name path; do
     fi
     mkdir -p "$backgrounds/$theme"
     echo "$name: fetching $path for $theme"
-    curl -fL --retry 3 --progress-bar -o "$file.part" "$from/$path"
-    mv "$file.part" "$file"
+    # fetched next to the themes' directories and moved in whole: the shell
+    # lists a theme's directory again when a file appears in it
+    curl -fL --retry 3 --progress-bar -o "$backgrounds/.$name.part" "$from/$path"
+    mv "$backgrounds/.$name.part" "$file"
 done

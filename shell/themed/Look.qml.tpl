@@ -14,6 +14,9 @@ QtObject {
     readonly property color accentFg: "{{ accentFg }}"
     readonly property color warning: "{{ warning }}"
     readonly property color error: "{{ error }}"
+    // the clock's, chosen for the background it stands on
+    readonly property color clock: "{{ clock }}"
+    readonly property color clockShadow: "{{ clockShadow }}"
     readonly property int frameBorder: {{ frameBorder }}
     readonly property real frameRounding: {{ frameRounding }}
     readonly property int panelRounding: {{ panelRounding }}

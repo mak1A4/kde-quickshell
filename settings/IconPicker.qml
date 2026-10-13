@@ -6,8 +6,9 @@ import org.kde.kirigami as Kirigami
 // The icons to choose from for one tray item: the shell's Tabler glyphs and
 // the icon theme's one-colour icons, drawn in one colour as the bar draws
 // them. A click on one sets it at once, and the bar shows it, so the dialog
-// stays open for trying another. Below are the two choices that are not in
-// the list: the item's own icon, and what the shell draws for it unasked.
+// stays open for trying another. Below are the choices that are not in the
+// list: the item's own icon, as it comes or as a shape in one colour (for one
+// that is black or white already), and what the shell draws for it unasked.
 QQC2.Dialog {
     id: root
 
@@ -155,6 +156,15 @@ QQC2.Dialog {
             enabled: (root.entry?.icon ?? "") !== ""
             QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.ActionRole
             onClicked: root.icons.choose(root.key, "")
+        }
+
+        QQC2.Button {
+            text: "Its Own Icon in One Colour"
+            // only an item in the tray has an icon to draw
+            visible: (root.entry?.own ?? "") !== ""
+            enabled: !root.icons.tinted(root.entry?.icon ?? "")
+            QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.ActionRole
+            onClicked: root.icons.choose(root.key, "own/tinted")
         }
 
         // only where the shell draws something of its own unasked;

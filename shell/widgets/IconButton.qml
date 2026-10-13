@@ -16,7 +16,7 @@ Rectangle {
     color: checked ? Theme.surface : (mouse.containsMouse ? Theme.surfaceHover : Theme.none)
 
     Behavior on color {
-        ColorAnim {}
+        HoverAnim {}
     }
 
     Icon {

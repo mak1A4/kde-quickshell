@@ -14,6 +14,8 @@ QtObject {
     readonly property color accentFg: "#1e1e2e"
     readonly property color warning: "#f9e2af"
     readonly property color error: "#f38ba8"
+    readonly property color clock: "#cdd6f4"
+    readonly property color clockShadow: "#b3000000"
     readonly property int frameBorder: 9
     readonly property real frameRounding: 7.5
     readonly property int panelRounding: 18

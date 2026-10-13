@@ -1,7 +1,8 @@
 #!/bin/sh
-# Klipper's clipboard history, for the command palette. Klipper (part of
-# plasmashell) stays the only one that records and stores it; this reads its
-# store and puts an entry back on the clipboard.
+# Klipper's clipboard history, for the panel from the top edge
+# (CommandPalette.qml). Klipper (part of plasmashell) stays the only one that
+# records and stores it; this reads its store and puts an entry back on the
+# clipboard.
 #
 #   clipboard.sh list [<word>...]
 #       The history as JSON, most recently used first; with words, only the

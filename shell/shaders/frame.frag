@@ -26,12 +26,19 @@ layout(std140, binding = 0) uniform buf {
     vec4 panel2;
     vec4 panel3;
     vec4 panel4;
+    vec4 panel5;
     // A tooltip bubble: a separate shape in its own colour, not merged with
     // the rest, but drawn here so it shares the shadow.
     vec4 bubble;
     float bubbleRadius;
     vec4 bubbleColor;
     float bubbleOpacity;
+    // Glass: how much of what is behind the shape shows through it (0: none,
+    // the solid shape), and how wide along its edge it is solid all the same.
+    // The compositor blurs what is behind glass, in whole pixels, so where the
+    // edge curves the blur ends in steps; the rim lies on them.
+    float glass;
+    float rim;
 };
 
 float sdRoundedBox(vec2 p, vec2 center, vec2 halfSize, float radius) {
@@ -66,9 +73,13 @@ void main() {
     d = merge(d, p, panel2, panelRadius, smoothing);
     d = merge(d, p, panel3, panelRadius, smoothing);
     d = merge(d, p, panel4, panelRadius, smoothing);
+    d = merge(d, p, panel5, panelRadius, smoothing);
 
     float fw = fwidth(d);
-    vec4 result = vec4(color.rgb, 1.0) * color.a * (1.0 - smoothstep(-fw, fw, d));
+    // solid for the rim's width in from the edge, less its last pixel, over
+    // which it thins to the glass
+    float body = 1.0 - glass * smoothstep(max(rim - 1.0, 0.0), max(rim, 0.001), -d);
+    vec4 result = vec4(color.rgb, 1.0) * color.a * body * (1.0 - smoothstep(-fw, fw, d));
 
     if (bubble.z > 0.0 && bubble.w > 0.0 && bubbleOpacity > 0.0) {
         float b = sdRoundedBox(p, bubble.xy, bubble.zw, min(bubbleRadius, min(bubble.z, bubble.w)));

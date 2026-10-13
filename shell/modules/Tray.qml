@@ -12,8 +12,8 @@ import "tray/symbols.js" as Symbols
 //
 // An item the user has chosen an icon for (BarItems.qml), or one listed in
 // tray/symbols.js, is drawn as a one-colour icon like the rest of the bar,
-// with a dot when its tooltip carries a count; any other keeps the icon it
-// brings.
+// with a dot when its tooltip carries a count: an icon in its place, or its
+// own as a shape in the bar's colour. Any other keeps the icon it brings.
 //
 // Every item is a cell like any other in the bar (BarButton, and the bar's
 // spacing between them), and its icon fills the same square whatever it is: a
@@ -36,8 +36,8 @@ ColumnLayout {
             // its own icon is one of the icon theme's one-colour icons
             readonly property string named: BarItems.plain(modelData.icon)
             readonly property bool plain: named !== ""
-            // a one-colour icon has one of the theme's colours, by the item's name
-            readonly property color hue: Theme.hueOf(Symbols.key(modelData.id, modelData.title, modelData.tooltipTitle))
+            // a one-colour icon has the colour of what is an application's
+            readonly property color hue: Theme.appHue
 
             tucked: !BarItems.expanded && BarItems.hidden(modelData)
             hintTitle: modelData.tooltipTitle || modelData.title || modelData.id
@@ -77,13 +77,15 @@ ColumnLayout {
                 Icon {
                     // a glyph is drawn larger than the square, see symbols.js
                     readonly property int glyphSize: Symbols.size(item.symbol, Theme.iconSize)
+                    readonly property bool tinted: Symbols.tinted(item.symbol)
 
                     anchors.centerIn: parent
                     width: glyphSize || Theme.iconSize
                     height: width
-                    roundToIconSize: glyphSize === 0
+                    // a picture has no drawing for 16 px to round to
+                    roundToIconSize: glyphSize === 0 && !tinted
                     visible: item.symbol !== ""
-                    source: BarItems.source(item.symbol)
+                    source: tinted ? item.modelData.icon : BarItems.source(item.symbol)
                     color: item.hue
                 }
 

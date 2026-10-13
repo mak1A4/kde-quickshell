@@ -5,9 +5,11 @@ import qs.widgets
 
 // The dock: a launcher button and the open windows, hidden until the pointer
 // touches the bottom frame edge, then sliding up from behind it. When the
-// launcher opens, the same panel grows into it. Fill the frame with this
-// item. `area` is the visible part (for the input region), `blob` its
-// background rectangle for the frame shader.
+// launcher opens, the same panel grows into it; when it closes, the panel
+// shrinks back into the dock only if the pointer is there, and otherwise goes
+// below the edge as it is. Fill the frame with this item. `area` is the
+// visible part (for the input region), `blob` its background rectangle for
+// the frame shader.
 Item {
     id: root
 
@@ -22,15 +24,26 @@ Item {
                 return true;
         return false;
     }
-    readonly property bool wanted: sensor.hovered || panelHover.hovered || held
+    // not by a pointer on the launcher while that is on its way out
+    readonly property bool wanted: sensor.hovered || (panelHover.hovered && !collapsing && !hidden) || held
     readonly property bool launcherOpen: Launcher.open && (Launcher.screen === null || Launcher.screen === screen)
     readonly property bool visibleNow: shown || launcherOpen
+    // The launcher has closed and no dock is to follow: the panel keeps the
+    // launcher's size and content until it is below the edge. Shrinking into
+    // the dock first, only for that to leave a moment later, was two
+    // departures for one.
+    property bool collapsing: false
+    // the panel has the launcher's size, not the dock's
+    readonly property bool large: launcherOpen || collapsing
+    // set around a change of size that nobody sees, which is not animated
+    property bool snap: false
 
     // 1 = fully below the edge, 0 = out; overshoots below 0 on the way out
     property real offset: visibleNow ? 0 : 1
     readonly property bool hidden: offset >= 1
-    property real w: launcherOpen ? launcher.implicitWidth : row.implicitWidth + Theme.padding * 2
-    property real h: launcherOpen ? launcher.implicitHeight : Theme.dockHeight
+    readonly property real dockWidth: row.implicitWidth + Theme.padding * 2
+    property real w: large ? launcher.implicitWidth : dockWidth
+    property real h: large ? launcher.implicitHeight : Theme.dockHeight
     readonly property real slack: 36
     readonly property real edgeY: height - Theme.frameBorder
 
@@ -52,12 +65,40 @@ Item {
         }
     }
 
+    // The pointer is where the dock is, or will be once the launcher has
+    // shrunk into it: the strip at the bottom of the panel, as wide as the dock.
+    function pointerOnDock(): bool {
+        if (sensor.hovered)
+            return true;
+        if (!panelHover.hovered)
+            return false;
+        const at = panelHover.point.position;
+        return at.y >= panel.height - Theme.dockHeight && Math.abs(at.x - panel.width / 2) <= dockWidth / 2;
+    }
+
     // after the launcher closes, the dock stays only if the pointer is on it
     onLauncherOpenChanged: {
-        if (launcherOpen)
+        if (launcherOpen) {
+            collapsing = false;
             shown = true;
-        else if (!wanted)
-            hide.restart();
+        } else if (pointerOnDock() || held) {
+            shown = true;
+            if (!wanted)
+                hide.restart();
+        } else {
+            hide.stop();
+            collapsing = true;
+            shown = false;
+        }
+    }
+
+    // below the edge: the dock's size again, for the next time it comes up
+    onHiddenChanged: {
+        if (hidden && collapsing) {
+            snap = true;
+            collapsing = false;
+            snap = false;
+        }
     }
 
     Behavior on offset {
@@ -65,10 +106,14 @@ Item {
     }
 
     Behavior on w {
+        enabled: !root.snap
+
         Anim {}
     }
 
     Behavior on h {
+        enabled: !root.snap
+
         Anim {}
     }
 
@@ -157,7 +202,7 @@ Item {
                     color: launcherHover.hovered ? Theme.surfaceHover : Theme.none
 
                     Behavior on color {
-                        ColorAnim {}
+                        HoverAnim {}
                     }
 
                     Icon {
@@ -206,8 +251,8 @@ Item {
                 // settled after overshooting.
                 x: (panel.width - width) / 2
                 anchors.bottom: parent.bottom
-                active: root.launcherOpen || opacity > 0
-                opacity: root.launcherOpen ? 1 : 0
+                active: root.large || opacity > 0
+                opacity: root.large ? 1 : 0
                 sourceComponent: LauncherPanel {}
 
                 Behavior on opacity {
@@ -222,7 +267,7 @@ Item {
             QtObject {
                 id: launcher
 
-                readonly property real implicitWidth: launcherLoader.item?.implicitWidth ?? 570
+                readonly property real implicitWidth: launcherLoader.item?.implicitWidth ?? 660
                 readonly property real implicitHeight: launcherLoader.item?.implicitHeight ?? Theme.dockHeight
             }
         }

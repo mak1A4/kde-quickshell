@@ -14,8 +14,12 @@ import qs.widgets
 // the middle, chooses the theme and its background for everything; Escape
 // puts the shell's colours back.
 //
-// Keys: Left/Right (or Tab, h/l) move, Home/End jump, Enter chooses, Escape
-// closes.
+// Only the light themes are in the row, or only the dark ones: one wants
+// the one or the other, and with both the row is twice as long. It opens
+// with the kind that is in use; Tab changes to the other.
+//
+// Keys: Left/Right (or h/l) move, Home/End jump, Tab changes between light
+// and dark, Enter chooses, Escape closes.
 Item {
     id: root
 
@@ -26,12 +30,24 @@ Item {
     // drawn smaller in it
     readonly property int slot: 252
     readonly property int shownSlots: 5
-    readonly property var looks: Looks.list
+    // which themes are in the row
+    property bool dark: true
+    readonly property var looks: Looks.list.filter(look => isDark(look) === dark)
     readonly property var current: looks[row.currentIndex] ?? null
     readonly property var currentColors: Theme.resolved(current?.colors ?? {})
 
     implicitWidth: slot * shownSlots + margin * 2
     implicitHeight: column.implicitHeight + margin * 2
+
+    function isDark(look: var): bool {
+        return ThemeExport.isDark(Theme.resolved(look.colors).bg);
+    }
+
+    // the kind of the theme in use, and its look in the middle
+    function start() {
+        dark = ThemeExport.isDark(Theme.applied.bg);
+        rewind();
+    }
 
     function choose() {
         if (!current)
@@ -40,9 +56,12 @@ Item {
         CommandPalette.hide();
     }
 
-    // the look that is in use, in the middle, without gliding there
+    // the look that is in use, in the middle, without gliding there; the
+    // first, in the row of the other kind
     function rewind() {
-        const at = Looks.indexOf(Themes.chosen, Themes.background.replace(/^.*\//, ""));
+        const file = Themes.background.replace(/^.*\//, "");
+        const exact = looks.findIndex(look => look.theme === Themes.chosen && look.file === file);
+        const at = exact >= 0 ? exact : looks.findIndex(look => look.theme === Themes.chosen);
         row.highlightMoveDuration = 0;
         row.currentIndex = Math.max(0, at);
         row.highlightMoveDuration = Theme.fadeDuration;
@@ -66,7 +85,7 @@ Item {
 
     Component.onCompleted: {
         Looks.refresh();
-        rewind();
+        start();
         row.forceActiveFocus();
     }
 
@@ -83,7 +102,7 @@ Item {
         // reopened before the previous panel had faded away
         function onOpenChanged() {
             if (CommandPalette.open) {
-                root.rewind();
+                root.start();
                 row.forceActiveFocus();
             } else if (!Themes.confirming) {
                 Themes.preview = null;
@@ -116,8 +135,8 @@ Item {
 
             Keys.onLeftPressed: decrementCurrentIndex()
             Keys.onRightPressed: incrementCurrentIndex()
-            Keys.onBacktabPressed: decrementCurrentIndex()
-            Keys.onTabPressed: incrementCurrentIndex()
+            Keys.onBacktabPressed: root.dark = !root.dark
+            Keys.onTabPressed: root.dark = !root.dark
             Keys.onReturnPressed: root.choose()
             Keys.onEnterPressed: root.choose()
             Keys.onEscapePressed: CommandPalette.hide()
@@ -349,7 +368,7 @@ Item {
                     Label {
                         font.pixelSize: 15
                         font.bold: true
-                        text: root.current ? Themes.title(root.current.theme) : (Looks.ready ? "No themes" : "Looking at the backgrounds…")
+                        text: root.current ? Themes.title(root.current.theme) : (Looks.ready ? (root.dark ? "No dark themes" : "No light themes") : "Looking at the backgrounds…")
                     }
 
                     Label {
@@ -395,9 +414,9 @@ Item {
                 font.pixelSize: 11
                 text: {
                     if (!root.current)
-                        return "Themes";
+                        return root.dark ? "Dark" : "Light";
                     const using = root.current.theme === Themes.chosen && Themes.background.endsWith("/" + root.current.file);
-                    return `${row.currentIndex + 1} of ${row.count}` + (using || (root.current.theme === Themes.chosen && root.current.file === "") ? "  ·  in use" : "");
+                    return `${root.dark ? "Dark" : "Light"}  ·  ${row.currentIndex + 1} of ${row.count}` + (using || (root.current.theme === Themes.chosen && root.current.file === "") ? "  ·  in use" : "");
                 }
             }
 
@@ -412,6 +431,11 @@ Item {
                 KeyHint {
                     key: "← →"
                     text: "Look"
+                }
+
+                KeyHint {
+                    key: "tab"
+                    text: root.dark ? "Light" : "Dark"
                 }
 
                 KeyHint {

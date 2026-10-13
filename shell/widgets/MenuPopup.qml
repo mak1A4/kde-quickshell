@@ -124,6 +124,10 @@ PopupWindow {
                     visible: !entry.separator
                     radius: Theme.radius
                     color: mouse.containsMouse || (child.item?.visible ?? false) ? Theme.surfaceHover : Theme.none
+
+                    Behavior on color {
+                        HoverAnim {}
+                    }
                 }
 
                 RowLayout {

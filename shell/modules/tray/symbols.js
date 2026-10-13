@@ -10,7 +10,10 @@
 // the icon it came with.
 //
 // An icon is written as the icon theme's name for it ("mail-unread-symbolic"),
-// "tabler/<name>" for one of the glyphs in icons/tabler, or a file's path.
+// "tabler/<name>" for one of the glyphs in icons/tabler (tools/tabler.sh
+// fetches the ones named here), a file's path, or "own/tinted" for the item's
+// own icon as a shape in the bar's colour: for one that is a single colour
+// already, black or white (Claude).
 
 // By the icon the item names, exactly.
 const icons = {
@@ -22,7 +25,9 @@ const icons = {
 // "chrome_status_icon_1", so the tooltip is often all there is to go by.
 const names = [
     ["teams", "teams-for-linux-tray"],
-    ["outlook", "mail-unread-symbolic"]
+    ["outlook", "mail-unread-symbolic"],
+    ["chatgpt", "tabler/brand-openai"],
+    ["claude", "own/tinted"]
 ];
 
 // The name of the item's own icon in the icon theme, or "" if it has none:
@@ -78,8 +83,14 @@ function label(id, title, tooltip) {
     return tooltip.replace(counted, "").trim() || title || id.replace(/_status_icon_\d+$/, "");
 }
 
+// Whether the icon is the item's own, drawn in one colour.
+function tinted(icon) {
+    return icon === "own/tinted";
+}
+
 // The icon as something `Kirigami.Icon` takes as its source; `tablerDir` is
-// where the Tabler glyphs are.
+// where the Tabler glyphs are. Not for a tinted one, whose source is the
+// item's.
 function source(icon, tablerDir) {
     if (icon.startsWith("tabler/"))
         return `file://${tablerDir}/${icon.slice(7)}.svg`;
@@ -90,9 +101,14 @@ function source(icon, tablerDir) {
 // that what is drawn is as large as the icon theme's symbolic icons beside
 // it; 0 for no size of its own. Kirigami draws those at 16 px (the standard
 // size below 18), and they nearly reach its edges. A Tabler glyph keeps 3 of
-// its 24 units clear on every side, so it is drawn at 21 px to span 16.
+// its 24 units clear on every side, so it is drawn at 21 px to span 16. One
+// of the `large` ones keeps about 1 clear, and spans 16 at the square's 18.
+const large = ["tabler/brand-openai"];
+
 function size(icon, square) {
-    return icon.startsWith("tabler/") ? Math.round(square * 7 / 6) : 0;
+    if (!icon.startsWith("tabler/"))
+        return 0;
+    return large.includes(icon) ? square : Math.round(square * 7 / 6);
 }
 
 // The bar's own modules that can be hidden like a tray item: what the module

@@ -53,7 +53,7 @@ RowLayout {
             height: width
             roundToIconSize: glyphSize === 0
             visible: root.entry.icon !== ""
-            source: root.icons.source(root.entry.icon)
+            source: root.icons.tinted(root.entry.icon) ? root.entry.own : root.icons.source(root.entry.icon)
             isMask: true
             color: Kirigami.Theme.textColor
         }
@@ -61,7 +61,7 @@ RowLayout {
 
     QQC2.Button {
         visible: !root.entry.module
-        text: root.entry.icon === "" ? "Its own icon" : root.icons.describe(root.entry.icon)
+        text: root.entry.icon === "" ? "Its own icon" : root.icons.tinted(root.entry.icon) ? "Its own icon in one colour" : root.icons.describe(root.entry.icon)
         onClicked: root.picker.chooseFor(root.key)
     }
 

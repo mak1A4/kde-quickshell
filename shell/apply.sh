@@ -25,6 +25,8 @@
 #                 ships of the same name where it has one, else a template
 #   VS Code       the theme's own colour theme, by name, in settings.json;
 #                 its extension has to be installed (setup.sh does)
+#   T3 Code       <its data>/userdata/themes/kde-quickshell.json, a theme it
+#                 follows while it runs
 #   browsers      Chromium and the ones made from it take the theme's colour
 #                 from machine policy, written by a helper of root's that
 #                 login.sh installs (browser-color.sh)
@@ -190,6 +192,27 @@ if [ -n "$label" ]; then
         rm -f "$new"
     done
 fi
+
+# ---- T3 Code --------------------------------------------------------------
+
+# It follows a theme the machine publishes: a file in its themes directory,
+# which its server watches, under a name that stays while the colours change.
+# The file has to be a real one (it does not read a link). It is told once
+# that this theme is the one to wear; a theme chosen in its own settings
+# after that stands.
+for t3 in "${T3CODE_HOME:-$data/t3}" "$HOME/.t3"; do
+    [ -d "$t3/userdata" ] || continue
+    render t3code.json.tpl "$t3/userdata/themes/kde-quickshell.json" || true
+    if [ -z "$quiet" ] && [ ! -e "$state/t3code-told" ] && [ -x "$t3/bin/t3" ]; then
+        if "$t3/bin/t3" theme set --base-dir "$t3" kde-quickshell > /dev/null 2>&1; then
+            mkdir -p "$state"
+            : > "$state/t3code-told"
+        else
+            echo "apply.sh: t3 theme set kde-quickshell failed" >&2
+        fi
+    fi
+    break
+done
 
 # ---- browsers -------------------------------------------------------------
 

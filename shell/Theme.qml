@@ -41,12 +41,29 @@ Singleton {
         // reads as a separate thing floating over it
         colors.tooltipBg = given.tooltipBg ?? colors.accent;
         colors.tooltipFg = given.tooltipFg ?? colors.accentFg;
-        // The six colours the bar's icons are drawn in: the theme's own red,
-        // green, yellow, blue, magenta and cyan, which are its terminal's.
-        // Those are made for text on the terminal's background and can be
-        // faint as a small icon on the frame: each is taken towards the
-        // text's colour until it stands out enough.
-        colors.hues = colors.terminal.slice(1, 7).map(hue => legible(hue, colors.bg, colors.fg));
+        // The two colours the bar's icons are drawn in, of the theme's own
+        // red, green, yellow, blue, magenta and cyan, which are its
+        // terminal's: one for the bar's own modules and one for what is an
+        // application's. Those are made for text on the terminal's
+        // background and can be faint as a small icon on the frame: each is
+        // taken towards the text's colour until it stands out enough.
+        //
+        // The modules' is green, or the next of these that is not the
+        // accent's colour: the icon of one turns to the accent for a state
+        // (power, while sleep is blocked). Never red or yellow, which say
+        // that something is wrong (the network). The applications' is the
+        // next that can be told from the modules', blue in most themes
+        // (Everforest's green, blue and cyan are much the same).
+        const [, green, , blue, magenta, cyan] = colors.terminal.slice(1, 7).map(hue => legible(hue, colors.bg, colors.fg));
+        const rest = [green, blue, cyan, magenta];
+        // the first of them that far from `other`, else the farthest
+        const take = (other, least) => {
+            const far = rest.map(hue => apart(hue, other));
+            const found = far.findIndex(distance => distance >= least);
+            return rest.splice(found < 0 ? far.indexOf(Math.max(...far)) : found, 1)[0];
+        };
+        colors.systemHue = take(colors.accent, 0.25);
+        colors.appHue = take(colors.systemHue, 0.3);
         if (given.bg) {
             colors.view = given.view ?? given.bg;
             colors.terminalBackground = given.terminalBackground ?? given.bg;
@@ -68,6 +85,11 @@ Singleton {
         return (high + 0.05) / (low + 0.05);
     }
 
+    // how far two colours are from each other, 0 to 1.7
+    function apart(a: color, b: color): real {
+        return Math.hypot(a.r - b.r, a.g - b.g, a.b - b.b);
+    }
+
     // `colour`, or as little of `towards` mixed into it as makes it stand
     // out from `on` three to one; at most half
     function legible(colour: color, on: color, towards: color): color {
@@ -87,7 +109,7 @@ Singleton {
     readonly property var chosen: Themes.preview ? resolved(Themes.preview) : applied
 
     // the colours the shell is drawn with: these fade
-    readonly property list<string> drawn: ["bg", "surface", "surfaceHover", "surfaceActive", "fg", "fgDim", "accent", "accentFg", "warning", "error", "tooltipBg", "tooltipFg"]
+    readonly property list<string> drawn: ["bg", "surface", "surfaceHover", "surfaceActive", "fg", "fgDim", "accent", "accentFg", "warning", "error", "tooltipBg", "tooltipFg", "systemHue", "appHue"]
 
     // A change of theme fades: every colour is on its way from what was on
     // screen when the theme changed (`from`) to the new theme's (`to`), and
@@ -102,8 +124,7 @@ Singleton {
 
     function shown(): var {
         const colors = {
-            desktops: [...desktopColors],
-            hues: [...hues]
+            desktops: [...desktopColors]
         };
         for (const key of drawn)
             colors[key] = mix(from[key], to[key]);
@@ -159,33 +180,17 @@ Singleton {
     // one per virtual desktop, by position, repeating
     readonly property list<color> desktopColors: to.desktops.map((color, i) => mix(from.desktops[i % from.desktops.length], color))
 
-    // red, green, yellow, blue, magenta, cyan: see `resolved`
-    readonly property list<color> hues: to.hues.map((color, i) => mix(from.hues[i], color))
-    // Which of them the icon of each of the bar's modules has. Power is not
-    // the accent's colour in any theme: its icon turns to the accent while
-    // sleep is blocked. Network is neither red nor yellow, which say that
-    // something is wrong with it.
-    readonly property var moduleHues: ({
-            session: 0,
-            audio: 1,
-            power: 2,
-            network: 3,
-            media: 4,
-            connect: 5
-        })
+    // The two colours of the bar's icons, see `resolved`: the bar's own
+    // modules, and what is an application's (an item in the tray).
+    readonly property color systemHue: mix(from.systemHue, to.systemHue)
+    readonly property color appHue: mix(from.appHue, to.appHue)
+    // The modules that are an application's too: the media player's, which
+    // is also next to the tray.
+    readonly property list<string> appModules: ["media"]
 
     // the colour of a module's icon in the bar
     function hue(module: string): color {
-        return hues[moduleHues[module] ?? -1] ?? fg;
-    }
-
-    // one of the six for anything with a name, always the same one: an
-    // item in the tray
-    function hueOf(name: string): color {
-        let sum = 0;
-        for (let i = 0; i < name.length; i++)
-            sum = (sum * 31 + name.charCodeAt(i)) % 9973;
-        return hues[sum % hues.length];
+        return appModules.includes(module) ? appHue : systemHue;
     }
 
     // Sizes are multiples of 3 logical px: whole device pixels at scale 1.333
@@ -201,6 +206,16 @@ Singleton {
     readonly property int barButtonHeight: 30
     readonly property int barSpacing: 0
     readonly property int dockHeight: 60
+    // How far the notch with the number of threads at work comes out of the
+    // top edge (ai/Notch.qml): less than its dots are high, which begin in
+    // the border.
+    readonly property int notchHeight: 9
+    // Between the shell and the windows (Exclusions.qml): a maximized window
+    // keeps this far from the border and the bar, and the desktop shows
+    // between. Room for the notch and a little more below it, and the same
+    // on every side, notch or not: the windows are framed evenly and do not
+    // move when the notch comes and goes.
+    readonly property int windowGap: notchHeight + 9
     readonly property int popupWidth: 420
     readonly property int pillHeight: 24
     readonly property int iconSize: 18
@@ -213,6 +228,29 @@ Singleton {
 
     // fillet radius where a panel flows into the frame
     readonly property int panelSmoothing: 21
+    // How much of its colour the frame has, and the panels that grow out of
+    // it. Below 1 they are glass: what is behind shows through, blurred
+    // (Frame.qml). 1 is the solid frame, as it was. Which of the two, and
+    // how transparent the glass, is the user's choice (Themes.glass,
+    // Themes.transparency).
+    readonly property real frameOpacity: Themes.glass ? 1 - Themes.transparency : 1
+    readonly property bool glass: frameOpacity < 1
+    // The colour of a card that lies on a panel (a search field, the
+    // launcher's rail, a notification): on glass it has as much of its
+    // colour as the glass has of its own, so that what is behind the panel
+    // shows through the card as well, a little less. Without glass, the
+    // colour as it is.
+    function card(colour: color): color {
+        return glass ? Qt.alpha(colour, frameOpacity) : colour;
+    }
+    // A field to write in is such a card, and on glass has a line around it,
+    // as the launcher's rail has: without one its faint colour ends nowhere
+    // in particular.
+    readonly property real fieldBorder: glass ? 1.5 : 0
+    // Glass is solid along its edge, this wide: the blur behind it is the
+    // compositor's and ends in whole pixels, in steps wherever the edge
+    // curves, and the rim lies on the steps (shaders/frame.frag).
+    readonly property int glassRim: 3
     // drop shadow the frame and its panels cast on the windows below
     readonly property real shadowOpacity: 0.5
 
@@ -224,7 +262,9 @@ Singleton {
     readonly property list<real> fadeCurve: [0.34, 0.8, 0.34, 1, 1, 1]
     // A highlight that follows the pointer from row to row has to keep up
     // with it: at the fade's 200 ms it trails behind and the list feels slow.
-    readonly property int followDuration: 70
+    // And so for everything that answers the pointer being on it (HoverAnim,
+    // Anim.Hover): one speed for all of the shell.
+    readonly property int followDuration: 40
     // When one content replaces another in the same panel, the new one waits
     // this long before fading in, so the two are not on screen together.
     readonly property int swapDelay: 140

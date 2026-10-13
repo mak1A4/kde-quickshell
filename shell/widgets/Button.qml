@@ -22,7 +22,7 @@ Rectangle {
     }
 
     Behavior on color {
-        ColorAnim {}
+        HoverAnim {}
     }
 
     RowLayout {

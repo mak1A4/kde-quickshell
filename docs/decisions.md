@@ -15,7 +15,19 @@ windows could not blend into the border.
   rectangles when idle. Everything else passes through to the windows underneath.
 - **Reserved space:** a layer surface reserves on one edge only, and this one touches all
   four, so `Exclusions.qml` adds four invisible, input-less 1 px surfaces with the
-  exclusive zones. Maximized windows end up exactly inside the border.
+  exclusive zones. Maximized windows ended up exactly inside the border; since
+  2026-10-13 they keep `Theme.windowGap`, 27 px, from it on every side and from the
+  bar, and the desktop shows between: the height of the notch that comes out of the
+  top edge (see "AI chat") and 9 px more. First the top alone kept the notch's height,
+  and only while the notch was out, which moved every maximized window when a thread
+  started or ended; then 9 px were added on all sides ("a little padding against the
+  notch and in general accross the shell … something like 8px"; 9 is the nearest whole
+  device pixels); then the user: "make it more uniform the same distance as on the top
+  including the notch all around". Seen: KWin's area for maximized windows at 36, 36,
+  1809 × 1008 on the 1920 × 1080 screen. The same day the gap went from 27 px to 18
+  with the notch, which now is 9 px deep and not 18 ("reduce the height the notch needs
+  and with that reduce the padding in general"; see "AI chat"): the area at 27, 27,
+  1827 × 1026.
 - **True fullscreen** windows cover the frame (KWin stacks them above the top layer).
   Accepted: the stated use is maximized windows.
 - **Popouts** (audio, power) are opened by a bar button via the `Popouts` singleton,
@@ -36,11 +48,57 @@ windows could not blend into the border.
   faint as an 18 px icon on the frame (Everforest Light's yellow on cream): each is
   taken towards the text's colour, a tenth at a time and at most half, until it stands
   out three to one. The hidden-icons arrow, the clock and the dock are as they were.
+- **Two colours, not six** (2026-10-09): with a few more items in the tray the bar was
+  "a little bit too colourful". Asked: three groups, the tray in the text's colour,
+  two colours, or none; two were chosen. What is an application's (the tray's
+  one-colour icons, and the media player, which is next to them) has one,
+  `Theme.appHue`, and the bar's own modules the other, `Theme.systemHue`; the per-module
+  colours and the colour by an item's name are gone. Which two is worked out per theme
+  (`Theme.resolved`), from green, blue, cyan and magenta in that order: the modules'
+  is the first that is not the accent's colour (power turns to the accent while sleep
+  is blocked), and never red or yellow (the network's trouble); the applications' is
+  the next that can be told from it. Green and blue in most themes; Everforest, whose
+  accent is its green, has blue and magenta, and Rosé Pine Dawn, whose green and blue
+  are both teal, has its rose for the applications. The states are as before.
 - **The pointer** is the pointing hand over anything a click does something on, as in a
   web page (2026-10-07): every `MouseArea` with an `onClicked` has
   `cursorShape: Qt.PointingHandCursor`. Not the ones that only stop clicks from going
   through, and not sliders. The clock has only this: no background under the pointer
   and none while its calendar is open (`BarButton.hoverEffect`).
+- **One speed for everything that answers the pointer** (2026-10-12; "can we make this
+  for all our hover effects so it's consistent everywhere in our shell", after the
+  launcher's list had been brought to 40 ms). They were of three kinds: most faded in
+  the 200 ms of any colour change (`ColorAnim`), the launcher's and the calendar's
+  days had the list's speed, the menus' entries had none at all. Now
+  `widgets/HoverAnim.qml` for a colour and `Anim.Hover` for a size or an opacity, both
+  `Theme.followDuration` (40 ms): the bar's buttons, the dock's icons and its launcher
+  button, `Button`, `IconButton`, the session panel's rows, the calendar's days and its
+  "today", the workspaces' dots (which grow) and their "add", the entries of both
+  menus, and in the launcher the side bar's entries, a result's action buttons and an
+  application's menu. Where the same colour also shows a state (the active window, an
+  armed session action, a button pressed in), that changes as quickly: one colour has
+  one animation. Left as they are: what only appears under the pointer (a
+  notification's close button, the list's "clear"), which is there at once; the lock
+  screen, which has its own copies of the widgets. Tested: the shell loads without a
+  warning after a restart, and the launcher opens. Not looked at: any of the effects.
+  - A new value in a QML `enum` (`Anim.Hover`) is not there after a hot reload: the
+    workspaces said "Unable to assign [undefined] to int" until the shell was restarted.
+- **A `MouseArea` that lies over others is taken away, not switched off** (2026-10-12;
+  "our cursor rule doesn't seem to apply to app launcher"). It applied nowhere on the
+  frame: every `MouseArea` has an arrow of its own (Qt gives it one when it is made),
+  the topmost item with a pointer shape under the pointer decides, and being disabled
+  does not take it out of that. The area over the whole frame that takes the hovering
+  while a menu is open (added 2026-10-08, the day after the rule) was `enabled` only
+  then, and its arrow was over everything always. It is `visible` only then now. Menus
+  and popups in windows of their own were not affected. Found with a panel of four
+  squares and `WAYLAND_DEBUG=1`, which shows the shape asked for
+  (`wp_cursor_shape_device_v1.set_shape`: 4 is the hand, 1 the arrow): over a hand, a
+  disabled `MouseArea` gives the arrow, an invisible one or a plain `Item` the hand.
+  Tested the same way on the shell itself, started by hand for it: the hand on a bar
+  button, a dock icon, a row of the launcher, an icon of its rail, a result; the arrow
+  on the launcher's heading and beside the open launcher. Not tested: a menu open, when
+  the area is there. A picture does not show any of this: `spectacle -p` draws an arrow
+  whatever the pointer is.
 - **Hints:** anything hoverable exposes `hintTitle` / `hintLines` and reports hover to
   `Popouts.hover()`. The frame shows the hint as a small panel sliding out of the bar, or
   as a bubble above the dock for window icons. Hints are outside the input region and
@@ -251,20 +309,120 @@ Popouts may now be narrower than `Theme.popupWidth`; the frame takes the content
 
 ## App launcher
 
-Opened from the first button in the dock, or with `qs ipc -p <config> call launcher
-toggle` (also `open`, `close`). The dock panel itself grows into the launcher, so it is
+**One panel for the menu and the search since 2026-10-12** ("they are too similar to
+have them separate"). Until then there were two: this launcher from the bottom, which
+searched applications with a scorer of its own, and a command palette from the top
+with KRunner's search (the next section). Asked which should stay and what typing
+should find: the launcher, and KRunner for everything. So with nothing typed it is
+the menu described here, and typing searches as the next section describes, in the
+launcher's list, the results taking the rail's room. What went: the launcher's own
+ranking (`launcher/search.js`), its count of what was started here
+(`launcher-usage.json`; KRunner keeps its own), its calculator (`launcher/calc.js`,
+`=`; KRunner's answers plain arithmetic), the palette's search panel and its key. The
+top panel is left with the clipboard history and the theme switcher; its singleton
+is still called `CommandPalette` and its IPC target `palette`.
+
+- **An application among the results is still an application here**: its menu
+  (favourite, pin, its own actions) and Ctrl+D work on it. KRunner names such a
+  result by what it runs (`exec:///usr/bin/dolphin`), not by its desktop entry, so
+  the entry is found by the result's title, and among several of one name by the
+  command (`Launcher.entryOf`). Enter on it is KRunner's own start.
+- **Nothing is listed for the moment between the first key and the first answer**
+  (about 100 ms): the menu's rows are gone and "Nothing found" waits until the
+  runners have answered. The launcher's own search answered at once.
+- **Enter in an application's menu** ran the row under it, not the chosen entry of
+  the menu: any key but the arrows closed the menu first, Enter among them. Not
+  noticed because the first entry is "Open". Enter is now looked at before that.
+- Tested (2026-10-12), on the running shell: `launcher search dolph` and the titles
+  read back, `> rel` (Reload shell), `2+3*4` (14 first); a picture of the results
+  (the typed letters picked out, a category at each row's end, the Enter hint beside
+  "Results"); Meta, "dolph" typed with the test keyboard, Shift+F10 on Dolphin and
+  two steps down in its menu (Remove from Favorites, Unpin from Dock: the entry was
+  found), Escape twice; a picture of the menu with nothing typed; the clipboard
+  history and the theme switcher opened and closed by IPC. Not tested: Enter or a
+  click on any result, a result's action buttons with Tab and Shift+Enter (no result
+  had any), Ctrl+D on a result, Enter before the results are there, a picture of
+  the clipboard history.
+
+Opened from the first button in the dock, with its key (see "Global shortcuts") or
+with `qs ipc -p <config> call launcher toggle` (also `open`, `close`, `search <text>`;
+`results` gives the titles of what was found). The dock panel itself grows into the launcher, so it is
 the same blob changing size, not a second panel. It began after Caelestia's launcher (a
 short result list over a search field) and has since 2026-10-07 what KDE's own menu
 has, in the shell's own layout; `>` for actions, the calculator and Noctalia's usage
 tracking are as they were.
 
-- **Layout** (`launcher/LauncherPanel.qml`, 570 by 501, a fixed size: it no longer
+- **Layout** (`launcher/LauncherPanel.qml`, 570 by 501 (660 by 549 since 2026-10-12, see the rail below), a fixed size: it no longer
   grows and shrinks as one types). On the left a rail of icons, as the bar is one on
   the right: favourites, all applications, each category, the places, the session.
   Beside it the name of the chosen one with how many are in it, and its list, eight
   rows with a description under each name. Below both the search field, where the dock
   was. Typing replaces rail and list by the results. The session's actions are rows
   like any others, and "Shell settings" is among the `>` actions.
+- **The rail in three groups** (2026-10-12; "not really 100% happy with it ... needs to
+  feel more polished", nothing more particular said, so this is what was seen wrong
+  with it). It was one column of fourteen grey icons, 30 px apart, to be read through
+  each time, with nothing to say what an icon is before it is clicked, and its chosen
+  icon on a grey bar like the list's chosen row beside it: two selections. Now the
+  favourites and all applications stand on top, the categories under them, the places
+  and the session at the bottom whatever is above (`part` in `Launcher.categories`),
+  with a short line between the groups. The chosen icon's bar is the accent, thinly
+  (stronger while the rail has the keys); the icon under the pointer has the grey bar.
+  Only a pointer that has moved counts, as in the list. No longer a `PickList`: that
+  has rows of one height at one distance.
+  - **The names are there always, in a side bar with a rounded border** (same day,
+    third form). First a bubble with the one name beside the icon under the pointer,
+    in the dock tooltip's colours: it lay over the first pixels of a row's icon. Then
+    the rail came out over the list when the pointer had rested on it for 350 ms, each
+    icon with its name, on a card as an application's menu has, and went back when the
+    pointer left. Then: "we have enough space to always show the sidebar with labels
+    not only icons", and of the bare column that made, "liked it better with the
+    rounded border". So the card stays and the side bar is 172 wide on it, always.
+  - **A little shadow under the card** ("give it more depth"): the frame's own shadow
+    in small (`MultiEffect`, 12 px, a point and a half down), on the card alone. The
+    pane around it no longer clips, or the shadow would end at its edge.
+  - **Its movements, made smoother** (same request; which ones was not said, these are
+    the three that were rough). *Typing and clearing:* the pane gave its room up and
+    took it back in the panels' movement, 500 ms and past the mark (a width that
+    overshoots nought), squeezing the side bar against its edge. Now the side bar fades
+    in 150 ms and steps 18 px aside, the list takes the room after 90 ms in 240 ms; back,
+    the list makes room at once and the side bar comes after 120 ms. A state of the body
+    with two transitions: as behaviours whose pauses were bound to the direction, the
+    pauses were the previous direction's (seen in the values of each frame: the side bar
+    came back over the list before there was room). *Another list* (a category chosen,
+    the search begun or given up) was put in place at a cut; heading and rows now fade
+    in in 180 ms and rise 6 px. Not results arriving while typing. Tested: the values of
+    each frame, both ways and for a category; a picture of the shadow. Not looked at
+    moving: a picture does not show it.
+  - **No heading over the list** ("this header can be removed", of "Favorites 11"):
+    the side bar says which list it is. The heading's height went to the rows, 52 px
+    where they were 48, so the panel is as tall as it was and the list begins and ends
+    with the card. For results it said "Results" and how many, which went too; what it
+    had beside that, the hints for Enter and Shift+Enter, is at the end of the search
+    field now (`KeyHint.keyColor`: the key's own grey is the field's). Tested: pictures
+    of the menu and of results for "dolph" with the hint in the field.
+  - **One bar under the pointer, moving, as in the list** ("the hover animation is
+    different in the sidebar than in the results"). It was: in the list the one
+    highlight goes to the row under the pointer in 70 ms, in the side bar each entry
+    had a bar of its own that faded in and out in place. Now the side bar has one grey
+    bar that goes from entry to entry in the same 70 ms, appears where the pointer
+    comes in and is not shown on the chosen entry. What stays different, on purpose:
+    in the list the pointer chooses the row, in the side bar it only marks the entry
+    and a click chooses (see "Keys" below for why). Tested: a picture with the test
+    pointer on Games, the bar there and the entry brighter. Not tested: the bar moving.
+  - **Tabler's icons, not the icon theme's** (`Launcher.glyph`, fetched by
+    `tools/tabler.sh`): Breeze's fourteen are of several hands and its "other" is
+    three dots. Tabler is what the notifications and the tray's stand-ins have.
+  - **Nine rows, 660 by 549**, where there were eight and 570 by 501: with fourteen
+    entries and two gaps in the height of eight rows an entry had 28 px, now 30 (the
+    icon 21 where it was 18); and the list beside the names keeps about the width it
+    had. Searching, the results have all of the 660, as the palette's had.
+  - Tested, from pictures: the side bar at rest in each form; in the second, the test
+    pointer resting on it and Left with four times Down (Games chosen and listed).
+    Not tested in the last form: the pointer on an entry, a click, the keys in it.
+    (The user was at the launcher while it was tested: an `open` over IPC emptied what
+    they had typed, and keys meant for the side bar went into their search. Look at
+    `isOpen` and `query` first and leave it alone while it is in use.)
 - **First laid out as KDE's menu is** (the user and the search on top, the categories
   as a list of names, a row of tabs and session buttons at the bottom, thin lines
   between): everything worked and it was KDE's menu in other colours. Taken back the
@@ -318,13 +476,13 @@ tracking are as they were.
   each app gets its own systemd unit and KDE's startup handling instead of being a child
   of the shell. `kstart` never returns for an id it cannot resolve, so it runs under
   `timeout 5`; on failure the entry is started by Quickshell directly.
-- **Ranking:** own scorer in `launcher/search.js` (exact, prefix, word start, initials,
+- **Ranking (until 2026-10-12, see above):** own scorer in `launcher/search.js` (exact, prefix, word start, initials,
   substring, letters in order; name counts most, then generic name, keywords, id,
   comment), with a little added for applications in regular use: launch count halved
   per two weeks since the last launch, stored in Quickshell's state dir
   (`launcher-usage.json`). (Before the menu, the list with no query was ordered by
   that use alone.)
-- **Calculator:** `=` prefix, or plain arithmetic. `launcher/calc.js` is a hand-written
+- **Calculator (until 2026-10-12):** `=` prefix, or plain arithmetic. `launcher/calc.js` is a hand-written
   parser, not `eval`. Enter copies the result with `wl-copy`; `Quickshell.clipboardText`
   did not reach the clipboard when tested.
 - **Actions (`>`):** the session actions (see "Session menu") plus reloading the shell.
@@ -334,6 +492,19 @@ tracking are as they were.
   closes so a click outside dismisses it, as for popouts.
 - **IPC naming:** functions must not be called `show`; `qs ipc` has a `show` subcommand
   and lists the function instead of calling it.
+- **Closing is one move** (2026-10-12; "double collapse because first the app bar is
+  shown and only then it fully collapses", noticed once the Meta key opened it). The
+  panel used to shrink into the dock, show the dock's icons, and leave 300 ms later
+  unless the pointer was on it. Now the dock follows only if the pointer is where it
+  is: on the bottom border, or on the strip at the bottom of the panel that the dock
+  takes up. Otherwise the panel goes below the edge as it is, at the launcher's size
+  and with its content, and takes the dock's size again out of sight, not animated
+  (`collapsing` in `Dock.qml`). A pointer on the departing panel does not hold it
+  back. Opening is as it was: the panel grows as it comes up. Tested: both ways with
+  the values of every frame written out (IPC `open` and `close`): pointer elsewhere,
+  the offset alone moves, 0 to 1 in about 220 ms, the size stays 570 by 501 and the
+  row's opacity 0; pointer on the dock, the shrinking as before. Not tested: a close
+  by a click on a row, and the pointer on the panel while it leaves.
 
 Tested for the menu (2026-10-07), on this machine, from pictures of the panel alone:
 the favourites (the eleven of KDE's menu, in its order), a category, the session;
@@ -345,9 +516,9 @@ Shift+F10, two steps down in it, Escape, after which the launcher was still open
 tested: any click (a row, the right button, an entry of the menu, an icon of the
 rail), Ctrl+D, opening a place, a session row, pinning from the menu.
 
-To open it with a key: System Settings > Keyboard > Shortcuts > Add New > Command, with
-`qs ipc -p /path/to/shell call launcher toggle`. The Meta key alone is wired by KWin to
-Plasma's own launcher and was left as it is.
+To open it with a key: "Toggle launcher" in the shell's settings (see "Global
+shortcuts"). On this machine that is the Meta key alone since 2026-10-12, taken over
+from Plasma's own launcher while the shell runs.
 
 - **Pointer and wheel in the list** (`widgets/PickList.qml`, 2026-10-06). The highlight
   follows the pointer in `Theme.followDuration` (70 ms), not in the 200 ms a key press
@@ -359,6 +530,52 @@ Plasma's own launcher and was left as it is.
   when they stop. Tested: the arithmetic, headless, with made-up wheel events (single
   and quick notches, the ends, small turns adding up, pixels, a key afterwards). Not
   tested: a real wheel.
+- **The pointer has the selection only while it is on the list** (2026-10-12; "the
+  hover effect of the content / result list should go away if it's not hovered
+  anymore"). The highlight stayed on the row the pointer was last on. Now, when the
+  pointer leaves the list, the selection goes back to the row the keys had chosen
+  (`PickList.keyed`; the first row if they chose none), in the keys' own movement: a
+  row stays marked because Enter is for it, but not one the pointer has left. The
+  launcher's and the clipboard history's list alike. The row an application's menu was
+  opened on counts as chosen by the keys, so it stays while the pointer is on the menu.
+  - Whether the pointer is on the list is asked of the list (a `HoverHandler` on it),
+    not of the rows. Asked of the rows (each reports the pointer's leaving, and no
+    report from another within 60 ms means gone): a row reported the pointer gone and
+    back at the line to the next row, and the selection went away from under a pointer
+    that then rested.
+  - The test pointer must be moved in small steps (3 by 8 px, 40 ms apart) for rows to
+    notice it at all: three jumps onto a row gave no hover report, and for a while
+    that looked like the handler taking the rows' hovering away.
+  - Tested, with the reports written out and two pictures: the pointer moved down to
+    the fourth row and resting there 0.8 s (the highlight on it, the list hovered
+    throughout), then out sideways (hovered false once, the highlight on the first
+    row). Not tested: keys first and then the pointer away, results arriving
+    meanwhile, the clipboard history.
+- **No row is marked before one is chosen** (2026-10-12, the same hour: "now it just
+  [goes] up again ... i don't want any hover highlight when i don't hover and only show
+  the highlight for keyboard when i actually start navigating with the keyboard").
+  Going back to the first row was still a highlight nobody had asked for, and so was
+  the first row's when the launcher opened. `PickList.lazy`, set for the launcher's
+  list: nothing is marked until the pointer is on a row or an arrow key is pressed
+  (`marked`). The first arrow key shows the first row and does not move from it. A
+  pointer that leaves goes back to the keys' row only if the keys have one. Typing
+  starts again with none.
+  - Enter with no row marked: among results it is for the first (the hint in the
+    search field says what it will do), since typing and Enter is what the launcher is
+    for; in the menu it does nothing. Both are a reading of what was asked, not asked.
+  - The clipboard history is as it was: its first entry is marked from the start.
+- **Under the pointer the highlight goes along in 70 ms, as before** (same day).
+  Tried without for a quarter of an hour ("remove the animation from the hover
+  highlight it feels kinda weird"): there at once on each row, coming and going
+  without fading, the side bar's grey bar likewise. Taken back: "we need the animate
+  hover back, still doesn't feel right". So it moves from row to row in 70 ms, appears
+  on the row the pointer comes in at and fades in and out in 100 ms; what it was that
+  felt weird is not found yet. The speed is `Theme.followDuration`: 40 ms since
+  ("let's try faster"), the fade 60; the wheel's 140 ms no longer hangs on it.
+- Tested (with the highlight not animated; not again since), from pictures: opened, no row marked; the pointer on the fourth row,
+  marked; the pointer out sideways, none; Down, the first row; Down twice more, the
+  third; "dolph" searched after that, none marked and "Open" in the field. Not
+  tested: Enter in any of these states, keys and then the pointer away.
 - **After a key, the pointer must travel 6 px before it selects again** (2026-10-06).
   The selection jumped back to the row under the pointer during keyboard navigation.
   Any movement of a pixel counted as the pointer moving, and a mouse beside a keyboard
@@ -368,7 +585,12 @@ Plasma's own launcher and was left as it is.
 
 ## Command palette (KRunner's search, own panel)
 
-`qs ipc -p <config> call palette toggle` (also `open`, `close`, `search <text>`) slides a
+Since 2026-10-12 this search is the launcher's (see "App launcher"): what follows about
+the search itself holds there, with `Launcher` for `CommandPalette` and
+`launcher/Runner.qml` for `palette/Runner.qml`. The panel from the top edge is still
+there for the clipboard history and the theme switcher.
+
+`qs ipc -p <config> call palette toggle` (also `open`, `close`, `search <text>`) slid a
 panel down from the top frame edge: search field on top, results below. It is the third
 panel in the frame shader (`panel2`), so it joins the border like the dock does. State and
 logic are in the `CommandPalette` singleton (`Palette` is a QtQuick type; a singleton by
@@ -731,6 +953,9 @@ while the shell runs and KRunner while it does not.
 
 ## Clipboard history in the palette
 
+(Since 2026-10-12 the panel has no search to go back to: Backspace in the empty field
+does nothing, and the panel opens in this mode or as the theme switcher only.)
+
 Meta+V (an override of Klipper's "Show Clipboard Items at Mouse Position", see "Global
 shortcuts") or `qs ipc call palette clipboard` opens the palette in a second mode that
 lists Klipper's history: text entries by their first line, images as thumbnails. Typing
@@ -760,8 +985,8 @@ nothing copied shows up while looking for an app.
 
 ## Global shortcuts: the shell's own actions in KDE's shortcut service
 
-`shell/Hotkeys.qml` registers the shell's actions ("Toggle command palette", "Toggle app
-launcher", "Show clipboard history") with KGlobalAccel under one component, `kde-quickshell` ("Quickshell"), as a
+`shell/Hotkeys.qml` registers the shell's actions ("Toggle launcher", "Show clipboard
+history", ...) with KGlobalAccel under one component, `kde-quickshell` ("Quickshell"), as a
 KDE application does, and listens for the service's `globalShortcutPressed` signal. KDE
 stores the keys (`[kde-quickshell]` in `kglobalshortcutsrc`) and lists the actions in
 System Settings > Keyboard > Shortcuts. A key press starts nothing and nothing depends on
@@ -774,7 +999,16 @@ where the shell's files are.
   cleared stays cleared). One `busctl --user monitor --json=short --match ...` runs for
   the signal on `/component/kde_quickshell`. KGlobalAccel does not track the registering
   connection, so the short-lived busctl calls are enough.
-- **Default:** Ctrl+Space for the palette, none for the others.
+- **Default:** none for any, since 2026-10-12. Until then Ctrl+Space for the palette.
+- **An action the shell no longer has is taken out of KDE** (2026-10-12, when the
+  palette's "Toggle command palette" went and its Meta+Space was "to be released for
+  use of something else"). Left alone it stayed registered with its key, which then
+  did nothing, and its override kept the key's owner switched off. `register` now
+  unregisters whatever KDE has for the component beyond the actions given
+  (`unregister`), and forgets its overrides, which switches the owner on again.
+  Tested: after the reload KDE listed four actions, without `toggle-palette`, in the
+  service and in `kglobalshortcutsrc`; the override's line was gone; Meta+Space was
+  KRunner's alone again, as KDE's settings have it. Not tested: pressing it.
 - **The keys are KDE's only while the shell runs.** KGlobalAccel does not notice a client
   going away, so a detached keeper process (one per shell process) waits for the shell's
   process to end, by quit, kill or crash (`tail --pid`), and then marks the component's
@@ -796,7 +1030,22 @@ where the shell's files are.
   `~/.config/kde-quickshell/shortcut-overrides.tsv` (action, key, owner), applied by the
   keeper at every start and written by the settings.
   Of the ways to switch the owner on again only that one worked; `doRegister` and setting
-  its keys again did not.- **Replaced (2026-10-04):** a desktop entry per action whose command was
+  its keys again did not.
+- **A modifier on its own is a key like any other** (2026-10-12). Meta pressed and let
+  go is Plasma's "Activate Application Launcher" (`plasmashell`, beside Alt+F1), an
+  ordinary entry in KGlobalAccel with the number of `Qt.Key_Meta`; nothing in `kwinrc`
+  (`ModifierOnlyShortcuts`) is involved. So the launcher gets it by an override like
+  any other, and Plasma's menu answers Meta again when the shell is gone. Switching
+  the owner off takes its Alt+F1 with it for that time. The settings window records
+  and shows such keys (`patterns` on KDE's button, the four modifiers in
+  `settings/keys.js`; Qt's name for the lone key is "Control", not "Ctrl"). Not a
+  default: an override is per machine, and a default key that another action holds is
+  not given to ours. Tested: the override set with `hotkeys.sh override`, then Meta
+  from the test keyboard four times in a row, launcher open and closed in turn, and a picture
+  with the launcher open and no menu of Plasma's; the key tables both ways through
+  KDE's button, headless. Not tested: recording Meta in the settings window, the
+  shell stopped and Plasma's menu on Meta again (the same path as KRunner's key).
+- **Replaced (2026-10-04):** a desktop entry per action whose command was
   `qs ipc -p <shell path> call <target> toggle`, with KDE attaching the key to the entry.
   It worked, but every key press started a process, the entries had to be written into
   `~/.local/share/applications/`, and `qs ipc -p` only finds a shell by the exact path it
@@ -929,6 +1178,23 @@ rounding and motion are still fixed.
   Dracula, Breeze (two). First there were themes generated from each wallpaper's
   colours; the user did not want invented themes, and an existing one has its colours
   for every program already. `tools/theme-from-picture.py` is gone.
+- **Sixteen more, ten of them light** (2026-10-09; the user wanted more variety, light
+  themes above all): Gruvbox Light, Tokyo Night Day, Kanagawa Lotus, Flexoki Light, Ayu
+  Light, GitHub Light, One Light, Dayfox, Melange Light, Iceberg Light; and Ayu Mirage,
+  One Dark, Flexoki Dark, GitHub Dark Dimmed, Oxocarbon, Rosé Pine Moon. The colours
+  are each theme's own, read from where it is published (its Neovim plugin's palette,
+  Flexoki's and Primer's tables, Atom's One); the terminal's as Ghostty ships them.
+  Where a palette has fewer steps of background than the shell has names for, the
+  missing ones are the last one taken a tenth or two towards the text (One Light,
+  Melange, Iceberg), as Solarized Light already had it. Not from the palette: Oxocarbon
+  has no yellow and no grey between its two ends, so `warning` and `fgDim` are IBM
+  Carbon's, which it is made from. Where Ghostty's selection is the text colour (an
+  inverted selection; the templates write the selection's text as the ordinary one),
+  `terminalSelection` is the theme's `surfaceHover`. `apps.vscode` only where the
+  extension is the theme's own or widely used and has a theme of exactly that name
+  (checked against each extension's manifest on the marketplace): none for Kanagawa
+  Lotus (the Kanagawa extension has the one dark theme), Flexoki, Dayfox, Melange and
+  Oxocarbon. `setup.sh` installs five extensions more.
 - **A theme is `<name>.json`**, `{ "colors": { ... }, "apps": { "nvim": "..." } }`. The
   shell is drawn with `bg`, `surface`, `surfaceHover`, `surfaceActive`, `fg`, `fgDim`,
   `accent`, `accentFg`, `warning`, `error` and `desktops` (a list, one per virtual
@@ -1034,6 +1300,17 @@ moving a file.
   of them; not the ones that are a game's menu or need the screen built around them)
   into the directory of the existing theme each goes with best, by eye. About 470 MB,
   not in this repository: most are artwork of games and films.
+- **Backgrounds from Studio Ghibli** (2026-10-09). `tools/ghibli.sh` fetches 52 stills
+  the studio itself gives out (ghibli.jp/works, fifty of each film, "to be used freely
+  within the bounds of common sense"): landscapes and skies, chosen from the small
+  pictures of twenty films, two or three for each theme by its colours, the light themes
+  first. 1920x1038, so drawn a third larger than they are on this screen; 14 MB.
+- **A file moved into a theme's directory was not always listed.** The list is made
+  again when the number of files changes. A download that is written as `x.part` and
+  renamed changes the number once, while the file has a name the list leaves out; and
+  a change during a listing was dropped. So a change during a listing is noted and
+  listed after it, and both tools fetch next to the themes' directories and move the
+  finished file in.
 - **Dead end:** `videoOutput: parent` in a `MediaPlayer` inside its `VideoOutput` showed
   black: a `MediaPlayer` is no `Item` and has no `parent`. It takes the output by `id`.
 
@@ -1076,6 +1353,14 @@ neighbours smaller, moved with the arrow keys, the wheel or a click.
   with ffmpeg (a video's frame two seconds in) in `~/.cache/kde-quickshell/thumbnails`;
   `Looks.qml` runs it at the shell's start, so the pictures are there when the switcher
   first opens (3 s for 30 the first time, then nothing).
+- **Light or dark, never both** (2026-10-10; the user: "i either want a dark or light
+  theme"). With 33 themes and 82 looks the row had become long. It holds the looks of
+  one kind (by the brightness of the theme's `bg`, as everywhere), opens with the kind
+  in use, and Tab changes to the other, which starts at its first look; the last line
+  says which kind it is and what Tab gives. Tab moved through the row before, as the
+  arrows still do. Seen on screen: opened in a light theme (38 looks), Tab with a real
+  key press (44 dark ones, the shell in the first one's colours), Escape and the
+  light theme back.
 - **It is a mode of the command palette** (`CommandPalette.mode: "themes"`,
   `picker/ThemePicker.qml`), as the clipboard history is: the frame's shader has five
   panels and all are taken, and the palette's panel, its keyboard and its closing were
@@ -1211,6 +1496,25 @@ read again.
   and not the first. It reads its settings again by itself. The extensions that hold the
   colour themes are installed by `setup.sh` at the shell's start, once, not at a change
   of theme: an extension is a program.
+- **T3 Code** (2026-10-09) follows a theme the machine publishes: a file in
+  `<its data>/userdata/themes/` (`~/.local/share/t3`, or `T3CODE_HOME`), which its
+  server watches and hands to the open windows, so a change shows at once. The file's
+  name is what the theme is known by, so it is one file, `kde-quickshell.json`, written
+  again with each theme's colours and title. It carries two colours T3 Code makes a
+  whole palette from (the view and the accent) and, over that, the ones the theme has
+  a name for: view for the conversation, `bg` for the side bar, `viewAlternate` for
+  cards and the box one writes in, `surface` for borders and what is under the pointer,
+  the two text colours, error, warning, and the terminal's four. With only the two
+  colours the cards and the writing box came out blue on Solarized's cream. One's own
+  messages and the chosen row in the side bar were first left to T3 Code, which fills
+  them with a strong tint of the accent: with Melange Light's orange a loud peach
+  (`#ffb38a` or so; the user: "that orange in t3code is too bright"). They are
+  `selectionAlternate` now (2026-10-10), the pale selection KDE has, paler again. It is told once that this is the theme to wear
+  (`t3 theme set`, noted in `~/.local/state/kde-quickshell/t3code-told`): a theme
+  chosen in its own settings afterwards stands, and "kde-quickshell" is in the list
+  there to go back to. The file must be a real one; T3 Code does not read a link. All
+  of this is read out of the installed build (0.0.46 nightly; no documentation looked for), so
+  it may change under us.
 - **Browsers, Omarchy's way:** Chromium and what is made from it (Helium reads
   Chromium's directory) take `BrowserThemeColor`, the theme's `bg`, from machine policy
   (`/etc/chromium/policies/managed/kde-quickshell.json`), and a running browser takes it
@@ -1250,6 +1554,32 @@ read again.
     Pinned tabs have no outline of their own, only that fill, so "tabs as the sidebar,
     pinned tabs outlined" (what the user asked for) is not to be had from outside
     Helium. And a browser only reads such a theme at its start. Not built.
+  - **The browser theme was built as a third way, and taken out again** (2026-10-10;
+    the user was happy with neither the policy's colour nor "Use QT", and asked whether
+    Helium could be patched: it could, at the price of building it for hours and again
+    at each of its updates). A manifest written at each change of theme and loaded with
+    `--load-extension`. Measured in a test Helium with vertical tabs: sidebar and
+    toolbar are the theme's `bg` to the digit; the address field is a shade Helium
+    makes of it (`omnibox_background` is not taken); menus, dialogs and settings pages
+    know light and dark only. What ended it is the tabs:
+    - **Helium draws its vertical tabs rightly only in its own grey.** Stock, with no
+      colour from anywhere: the tab in use is a filled pill, the others have none. With
+      a theme, and just so with the policy's colour: the tab in use is `toolbar`, which
+      the sidebar is too, so it has no box, and the others are pills in
+      `background_tab`: the wrong way round (the user: "why are all tabs that are not
+      active highlighted but the one that is active is not?"). With both colours the
+      same nothing tells the tabs apart. With "Use QT" there are no boxes at all.
+    - **Chromium's own colour setting does nothing in Helium:** `browser.theme.user_color2`
+      with `color_variant2` and `is_grayscale2: false` in a profile's `Preferences`
+      comes out as stock, and `is_grayscale2` is true again afterwards.
+    - **Not together with the policy:** with `BrowserThemeColor` set the theme is not
+      worn at all. **Only at the browser's start:** a running browser does not read a
+      changed manifest, also not when started once more with the same flags; after a
+      restart it does, and the "Installed theme ... Undo" bar comes the first time only.
+    - So the user went back to stock Helium (`"browsers": "system"`, "Classic" in its
+      settings): grey, light or dark with the desktop, tabs as they are meant. Exact
+      colours with a filled tab in use need Helium's themed tab drawing changed, in its
+      source. Not done.
 - **Not covered:** Konsole; Firefox.
 
 Tested, on the running session: `everforest`, `solarized-light` and `tokyo-night` chosen
@@ -1269,7 +1599,10 @@ KDE had rewritten it twice; Ghostty's tab bar before and after. For btop, VS Cod
 question for the password), the name in VS Code's settings and btop's theme file read;
 Helium's toolbar seen to lose its green; every theme's VS Code name checked against the
 colour themes the installed extensions and VS Code itself declare (three were wrong).
-Not seen on screen: VS Code and btop themselves.
+Not seen on screen: VS Code and btop themselves. For T3 Code: the file written and
+`t3 theme show` naming it, the running window seen to turn to Solarized Light without a
+restart, and again after the surfaces were added; the file read with Everforest Light's
+colours after the user changed theme. Not seen on screen: a dark theme.
 
 ## Lock screen: KDE's locker, the shell's interface
 
@@ -1304,6 +1637,23 @@ switch user, as far as the session allows them.
   `setup.json` says `"lockscreen": false`. KWin has its environment from its start, so
   it counts from the next login; a changed lock screen is copied at the shell's next
   start and shown at the next lock.
+- **The clock's colour is chosen for the picture it stands on** (2026-10-10; the user:
+  "the clock on the lockscreen has problematic colors often"). It was the theme's text
+  colour with a dark shadow, which is right on the theme's surfaces and only by chance
+  on a wallpaper: a light theme's grey text with a dark shadow on a dark or a busy
+  picture, a dark theme's light text on a bright one. Now the shell measures what is
+  under the clock (`ThemeExport.qml`: ffmpeg, the middle half of the picture's width
+  from 24 % to 49 % of its height as the wallpaper crops it, 16 by 8 grey values; a
+  video's frame two seconds in) and gives the lock screen `clock` and `clockShadow`
+  in `Look.qml`: the theme's darkest or lightest tone, whichever has the better
+  contrast on the worst tenth of those values, with a shadow of the other kind (a
+  light glow under dark figures). The tones are taken further in their own hue first,
+  until the dark one is dark and the light one light (luminance 0.04 and 0.8):
+  Solarized Light's text is a middle grey. With no background of the theme's (Plasma's
+  own wallpaper, which the shell does not know) it is the light tone with the dark
+  shadow. Considered and not done: a plate in the theme's colour behind the clock
+  (always readable, but a box on the picture); measuring in the lock screen itself
+  (plain QML cannot read a video's pixels).
 - **If it fails.** QML that does not load: the locker shows its built-in screen. QML
   that loads and cannot be used: `loginctl unlock-sessions` from a console.
 - **What is not there** of Plasma's lock screen: media controls, the on-screen keyboard,
@@ -1324,6 +1674,9 @@ from `Look.qml`; the package found through `PLASMA_DEFAULT_SHELL` with the user'
 tested: anything in the real locker (it has the environment only after a login): typing,
 unlocking, a wrong password as PAM reports it, sleep and switch user, the motion of the
 panels (only stills were taken), two monitors, a user picture (this user has none).
+For the clock: `clock` and `clockShadow` read in `colors.json` and `Look.qml` on the
+running shell; before and after drawn onto twenty wallpapers outside the lock screen
+(the same measuring, in a script) and looked at. Not tested: the lock screen itself.
 
 ## Setup: looked at each time the shell starts
 
@@ -1421,7 +1774,7 @@ sending a run of movements towards the edge.
 the logged-in user here). They arrive like a real keyboard's, through KWin, so global
 shortcuts, the layer surface's keyboard focus and Qt's auto-repeat for a held key are all
 part of what is tested. The IPC handlers answer `isOpen` and `query`
-(`qs ipc call palette query`), so a script can check what a key did; where the effect
+(`qs ipc call launcher query`), so a script can check what a key did; where the effect
 is only visible (which row is highlighted), take a screenshot (`spectacle -b -n -f -o`).
 
 The keys go to whatever has the focus, and on a desktop someone is using that changes
@@ -1560,9 +1913,22 @@ keeps the icon it brings.
   `-symbolic` ending: an icon only the item's directory has would come out as "unknown".
   Considered: Tabler's `brand-steam` as a default in `symbols.js`, an outline next to
   filled neighbours, and for Steam alone.
-- **Defaults** are in `modules/tray/symbols.js`: Outlook, Teams and Remote Control have an
-  icon unasked. An item is recognised by the icon it names (`krfb`) or by a word in its
-  id, title or tooltip.
+- **Defaults** are in `modules/tray/symbols.js`: Outlook, Teams, Remote Control, ChatGPT
+  and Claude have an icon unasked. An item is recognised by the icon it names (`krfb`) or
+  by a word in its id, title or tooltip.
+- **An item's own picture as a shape in the bar's colour** (`"own/tinted"` where an icon
+  is written; in the settings' list of icons the button "Its Own Icon in One Colour").
+  For a picture that is one colour already: Claude's is its mark in black, and neither
+  Tabler nor Papirus has it. `Kirigami.Icon` takes the tray's image (`image://...`) as
+  its source and masks it like any other, at the full 18 px of the square: rounded to
+  16 px like a theme icon, the thin rays came out faint. Not for a picture with a
+  background: ChatGPT's is its mark on a white tile, which would be a filled square, so
+  it has Tabler's `brand-openai` (Gruvbox Plus has a filled `indicator-chatgpt` for
+  panels, Papirus has none, and a default has to be there under any theme). That glyph
+  does not keep Tabler's margin: at the 21 px of the other glyphs it spanned nearly
+  19 px and was said to look out of place at once, so it is drawn at 18 px (`large` in
+  `symbols.js`). Compared beside it: the logo as Simple Icons has it, too thin at this
+  size, and Gruvbox Plus' at 16 px, which spans 14.
 - **The key** a choice is filed under is the item's id (with its title, if it has one).
   Electron applications send only a pixmap and an id like `chrome_status_icon_1`, so for
   Outlook the tooltip without its count is the key.
@@ -1591,7 +1957,7 @@ keeps the icon it brings.
   hence a `ScriptModel` over the keys.
 - Under an icon theme without a chosen name the item shows Kirigami's "unknown" icon.
   Only the Tabler glyphs that `tools/tabler.sh` has fetched are offered (those the
-  notifications use). Editing `symbols.js` does not reload the shell; restart it.
+  notifications use, and those `symbols.js` names). Editing `symbols.js` does not reload the shell; restart it.
 - Tested: the settings' code headless (list of items; choosing, resetting, hiding and
   forgetting, and the file after each); a choice written by it showing in the running
   bar and going again on reset; hidden items leaving the bar, coming with the arrow's
@@ -1735,3 +2101,397 @@ where the half-pixel offset is intended.
 
 A failed `import` kills the whole file. Widgets that import KDE modules live in their own
 file behind a `Loader`, with a visible error label on `Loader.Error`.
+
+## AI chat (T3 Code) in a panel of its own
+
+Meta+Space opens a native panel for T3 Code (`shell/Ai.qml`, `shell/ai/AiPanel.qml`),
+in two pages that take turns. Home: a composer for a new thread, and under it one
+list, every thread of the user's own, the ones that wait for an answer first, then the
+running ones, then what has ended unseen. Thread: the conversation and a field for a
+follow-up. It is the one shell action with a default key — `toggle-ai` with Meta+Space,
+an override of KRunner's (recorded per machine with `hotkeys.sh override`, like
+Meta+V), because the user asked for that key.
+
+- **Native, not T3's web UI.** A web view cannot live in this process: QtWebEngine and
+  QtWebView both crash Quickshell at startup (Chromium: "Argument list is empty"),
+  reproduced three times in throwaway configs. A separate helper window was rejected
+  the same way: it could not merge into the frame. So the panel speaks T3's protocol
+  itself — bearer auth from the pairing exchange (`client_label: "kde quickshell"`,
+  token in `~/.config/kde-quickshell/ai.json`, mode 600), reads over HTTP, writes and
+  two streams over Effect RPC on `/ws` (see `Ai.qml`). All of it is read out of the
+  installed build (0.0.46 nightly), so it may change under us.
+- **One authorized client, on purpose.** Every pairing exchange creates a client in
+  T3's settings. The panel pairs once, stores the 30-day token and reuses it; the
+  probes that mapped the protocol created several "t3 pair" clients, revoked by hand
+  afterwards (a paired client lacks the `access:read` scope to revoke others).
+- **The panel needed a sixth shader blob** (`panel5` in `frame.frag`). Noted while
+  building: a rebuilt `.qsb` alone is not picked up on reload — the running process
+  keeps its compiled shader; a full restart of the shell is needed, or the new panel
+  silently gets no background.
+- **The first version showed a thread as it was when it was opened, and nothing
+  after** (2026-10-13; the user: "not happy with how it looks and works"). Three
+  causes, each enough by itself:
+  - A stream sends its next chunk only after the last one was acknowledged
+    (`{"_tag":"Ack","requestId":...}`). Never acknowledged, a stream is its first
+    chunk, the snapshot, and then silence. Found only against the real server: a
+    stand-in written from the build's schemas sent everything unasked.
+  - The thread over HTTP is `{ snapshotSequence, projection: { thread, ... } }`; the
+    panel looked for `thread` one level up and threw every answer away.
+  - A subagent's thread has an id with colons and per cent signs in it, which went
+    into the URL as it was: 404 for seventeen of the user's twenty threads.
+- **Streams, not polling.** `subscribeShell` gives every thread in short and each
+  change to one; `subscribeThread` gives one thread whole and then its events. A
+  `turn-item.updated` carries the item whole and is put in place, so an answer appears
+  as it is written; a `run.updated` likewise. Anything else asks for the thread again
+  once the stream has been quiet for a moment, not per event: a long thread is
+  megabytes (7.6 MB for 1317 items). The shell's stream sends a second "snapshot"
+  right after the first, with no threads in it and `resolvedRepositoryIdentityRoots`
+  beside it; it only says which projects' repositories are known. Taken for a list of
+  threads, it emptied the panel.
+- **The rows are a model that is changed, not a list that is replaced.** A JavaScript
+  array as a `ListView`'s model is rebuilt whole for every change, and the view was
+  put at its end each time: while the agent wrote, nothing above could be read. Now
+  the list stays at its end only while it is there (`follow` in `AiPanel.qml`); wheel
+  or PageUp away from it and it holds still.
+- **What the agent did between two messages is one row** ("3 commands, 1 edit · 4s"),
+  to be unfolded; while it is at it, the row is the step it is at. One row for each
+  step was a wall of grey lines with the answers lost in it. An answer is drawn block
+  by block: Qt's Markdown has no room between paragraphs and nothing behind code, so
+  each paragraph is a text of its own and each fenced block a card with a copy button.
+  Text can be selected; copying goes through `wl-copy`, as in the launcher.
+- **Subagents' threads are not listed.** T3 lists them like any other (`lineage.
+  parentThreadId` set, `creationSource: "provider"`); the list was mostly those, all
+  "Idle". A thread's state is not its `status` (only ever `idle` or a run's) but what
+  is made of it in `Ai.kindOf()`: waiting if there is a `pendingRuntimeRequest` or a
+  plan to accept, running if there is an `activeRunId`, done or failed if the last run
+  ended after `lastVisitedAt` (the panel says `thread.visit` when a thread is opened,
+  so T3's own window shows it as read too), else nothing.
+- **The selectors are lists, not buttons that step.** Each showed "▾" and went to the
+  next value at a click: eight projects, seven clicks. Their choices go into the one
+  list under the composer for as long as one is chosen from (Tab goes through them),
+  so there is one list and one way to move in it. They are for a new thread only; a
+  follow-up went out with the model chosen on the home page, whatever its thread had,
+  and now goes out with none, which T3 takes as the thread's own.
+- **The shell keeps the connection while the server is there**, panel open or not,
+  once it has been paired: a run that ends or waits for an answer is worth knowing
+  about then. `ai.sh notify` sends a notification as T3 Code's whose click opens the
+  panel on the thread (`notify-send --wait`, then `qs ipc --pid`): critical, so it
+  pops up, for one that waits; quiet for one that ended. Not for the thread on show.
+  A shell that was never paired asks nothing of anyone.
+- **The threads are two numbers in a notch in the top edge's middle**
+  (`ai/Notch.qml`), in binary, dots across as the clock's are down, the lowest at the
+  right, and two of them side by side as the clock has two. Right, five dots in the
+  accent: how many are at work. Left, three dots: in how many it is the user's turn,
+  one that has ended and has not been looked at (green, as in the list), or one that
+  waits for an answer and goes no further without it (then the warning's colour). It
+  is there only while one of the two is not 0. It was an icon in the bar first (a
+  sparkle that breathed while one ran, `modules/Agents.qml`), for a morning; the user:
+  "i dont want this here … i want it on the top as a binary thing like we have our
+  watch". Then one number, of the threads at work; the user: "we should also think
+  about how we can show when something is finished and waits for input". The notch is
+  the AI panel itself, let out as far as the dots need while it is closed
+  (`aiPanel.notch` in `Frame.qml`): no blob of its own in the shader, and the panel
+  grows out of it when it opens. The dots stay where they are when it does, at the
+  top of the open panel, whose content begins where the notch ends (the user: "we
+  should keep the binary dots visible when we open up the whole thing"); there they
+  show none as none. A click on the notch opens the panel, on the thread that waits
+  if exactly one does. It steps aside for the palette, which hangs in the same place.
+  `Dots.qml` got `across` for it. The panel grew out of the notch in jerks (the user:
+  "the animation is jagged when i click the notch … everything else is smooth"), for
+  two reasons that only show when a top panel changes its width while it is out,
+  which nothing did before. `TopPanel` put its left edge on a whole pixel at every
+  step, so the edge went in jumps of 3 px while the width changed evenly, and the
+  right edge forth and back by as much; now the edge is as far off a pixel all the
+  way as it needs to be at rest. And the panel's content was only made at the click,
+  so the panel first grew towards a guessed size and turned round when the content
+  had one; it is made while the notch is out. Worked out in figures, the edges'
+  positions for each width; the animation itself was not watched. It lay on a
+  maximized browser's tabs (the user:
+  "maximized windows … are not allowed to overlay the notch"), so the windows keep
+  clear of it: the gap between the frame and the windows has room for it, on every
+  side alike (see "Reserved space" at the top). The notch was as deep as its dots and
+  the room around them, 18 px (3 above the 9 px dots, 6 below). It is 9 now
+  (`Theme.notchHeight`): the dots begin 3 px up in the border, which is of the notch's
+  own stuff (`rise` in `Notch.qml`), and have 3 px under them. A panel keeps what is in
+  it off the border, so the dots are no longer in the AI panel but beside it in
+  `Frame.qml`, in its middle and moving with it (`TopPanel.slide`). The open panel's
+  content begins 6 px under the dots as before. Seen on the real desktop, the frame
+  solid at the time, in a picture of the top edge alone: the notch a shallow swelling,
+  its edge smooth, the dots across the border's line. Not seen: the notch on glass
+  (the blur along so shallow a curve), the notch coming out and going back, the open
+  panel under the dots, a click on the dots where they are in the border.
+- **At work is more than a run that is going.** A thread whose run has ended can have
+  a subagent, a command or a monitor of it still going (`pendingBackgroundTasks`);
+  T3's own window says "waiting" then, the panel "In the background", and it counts
+  as at work. Not counted at first: the notch was in while a subagent ran (the user:
+  "thats not true i have stuff working right now").
+- **More servers than this machine's** (2026-10-13). T3 Code's own window shows the
+  threads of other machines beside the local ones ("environments"); each is a server
+  of its own (the user's laptop, `air`, at its LAN and Tailscale addresses, port
+  3773), and the local server knows nothing of them. The window's pairings with them
+  are kept encrypted (`connection-catalog.json`, with a key from the wallet) and are
+  not taken: the shell is paired with such a server itself, as with the local one, a
+  client of its own there. `t3 pair` on that machine, then
+  `qs ipc call ai pair http://<host>:3773 <token>`: the server says who it is at
+  `/.well-known/t3/environment` (id and name, unasked), the token is exchanged, and
+  the server is kept in `ai.json` (`environments`). `shell/AiLink.qml` is one server:
+  session, reads, the socket and its two streams; `Ai.qml` has one for this machine
+  and one for each other, and its threads and projects are all of theirs, each
+  marked with its server. A thread is opened, written to and answered on its own
+  server, a new one started on its project's. `ai environments` lists them,
+  `ai forget <key>` drops one. Seen against two stand-in servers: pairing, a thread
+  started on the second from the panel, its approval answered there, the counts and
+  the notification ("air · mock"), the second server going and coming back. Not
+  seen: the real `air` (no token for it yet). The model for a new thread is one of
+  this machine's favourites also on another server, which may not have it.
+- An approval is answered in the panel (approve, approve for the session, decline),
+  and so is a question: an answer per question id, an option's label or words of
+  one's own, as T3's own window sends them (seen in an answered one). Neither was
+  tried against the real server, only against the stand-in below. Diffs,
+  attachments, the terminal and plans to accept stay in T3's own app.
+- **Testing.** `tools/t3-mock.py` is a stand-in server: the HTTP reads, the ticket,
+  the two streams with their acknowledgements, and a scripted run for every message
+  (one with "approve", "question" or "fail" in it does that). The panel was run
+  against it in a second Quickshell, off screen: a copy of `shell/` with `shell.qml`
+  replaced by a window holding `AiPanel` and an IPC handler that saves it as an image
+  (`grabToImage`), started with `QT_QPA_PLATFORM=offscreen`, `XDG_CONFIG_HOME` and
+  `T3CODE_HOME` in a scratch directory and a `notify-send` of its own first in `PATH`.
+  In that copy `Themes`, `Notifications`, `Launcher`, `CommandPalette` and `BarItems`
+  must be stand-ins: the real `Themes` sets the desktop's wallpaper, the real
+  `Notifications` takes the notification service from the running shell. Seen there:
+  home and every selector, a run from start to end, an approval, a question, a
+  failure, the server going and coming back, a thread of 1317 items (open in half a
+  second, 10 ms for each redraw of its rows), a dark theme, the notch's dots for one
+  and three threads and for one that waits. Seen in the running shell, against the
+  real server: the list, a thread, one run started with the panel closed that went
+  from running to finished in the list and sent its notification, and the notch in
+  the frame with one thread at work. Not tried with real keys: the home page's Down,
+  Tab and Escape. Not seen: the panel growing out of the notch, a click on it.
+
+## Glass: the frame half transparent, what is behind it blurred
+
+Tried on 2026-10-13 at the user's wish ("make the shell half transparent and blurred …
+with quickshell if possible no kde things"). `Theme.frameOpacity` is how much of its
+colour the frame and its panels have; below 1 they are glass (`Theme.glass`), at 1 the
+frame is drawn exactly as before. It is 0.5 now.
+
+- **The blur is the compositor's, asked for through Wayland's own protocol**
+  (`ext-background-effect-v1`), which Quickshell 0.3.2 has as `BackgroundEffect.
+  blurRegion` and KWin 6.7 answers. Nothing of KDE's is named. How strong the blur
+  is, is the compositor's setting, not the shell's.
+- **Where to blur has to be said in rectangles and ellipses** (`blur` in `Frame.qml`):
+  the whole surface, less the hole with its rounded corners, and each panel's blob put
+  back as a rounded rectangle (`widgets/BlurBlob.qml`). The fillets where a panel meets
+  the border are not in that. Each is laid out as strips one pixel thick along the
+  border's edge (`widgets/BlurFillet.qml`, `BlurStrip.qml`), as long as the shape is
+  wide there by the shader's own formula: its smooth minimum of the distances a from
+  the edge and b from the panel ends where (k − a)² + (k − b)² = k², k the smoothing
+  radius. Twice it was done with a circle instead, a region's only curve, and twice
+  the notch gave it away: first as a square less a quarter circle beside the panel,
+  then as the circle that touches the edge and the panel's rounded corner. The curve
+  is an arc of a circle only out of a deep panel, where b is the distance from a
+  straight side; out of the notch (18 px deep under a 21 px fillet) b is the distance
+  from a rounded corner and the shape is up to 6 px wider than that circle, which left
+  glass without blur inside the rim, in steps (the user: "why do still see some
+  jaggedness here"). Checked by a model of both, pixel by pixel, for the notch, a deep
+  panel and the launcher: no blur outside the shape, and no glass without blur more
+  than 1.1 px in from the edge, which the rim's solid 2 px cover.
+- **Glass has a solid rim, 3 px (`Theme.glassRim`), and that is what makes its edge
+  smooth.** Regions are whole pixels (of the surface's own, 1.33 of the screen's at
+  this scale) and a pixel is blurred or it is not, so along a curve the blur ends in
+  steps. Where a white window and a dark wallpaper meet behind the glass, blurred and
+  not blurred are far apart, and the steps were the edge one saw (the user, with a
+  picture of a fillet: "does this look smooth to you?"). Keeping the steps a pixel
+  inside the glass did not hide them there. No protocol says where to blur any finer,
+  and drawing a blurred copy of the wallpaper oneself was refused ("i dont want a
+  fake copy"). So `frame.frag` draws the shape solid for the rim's width in from its
+  edge, thinning to the glass over the last pixel (`glass`, `rim`), and the blur is a
+  little less than the shape at every curve (the hole taken out with corners a pixel
+  tighter, a panel put back with corners a pixel wider, each strip of a fillet
+  ending a pixel short): the steps lie under the rim. Straight edges lie on whole
+  pixels.
+- **The shadow is made apart and the shape cut out of it.** `MultiEffect` lays the
+  shadow under the whole shape as well as around it; through glass that is a grey film.
+  So the shape is drawn once solid and unseen, its shadow cast from that, and the same
+  solid shape is the effect's inverted mask. One `MultiEffect` does both: the mask is
+  applied after the shadow (read in its shader). The mask has to be soft
+  (`maskThresholdMin: 0.5`, `maskSpreadAtMin: 1`: about as much shadow left as the
+  shape leaves of a pixel uncovered). By default it is hard, gone wherever there is
+  any of the shape: the shadow then ended in steps a pixel outside every curve, with
+  a light seam between it and the glass (the user: "anything rounded looks jagged …
+  i see the pixels"). That, far more than the blur's steps, was what showed.
+- **How much shows through is the shader's to say** (`glass`), not the colour's and
+  not the item's `opacity`. The first glass was dark grey on a light theme: a colour
+  reaches a `ShaderEffect` already multiplied by its alpha, and `frame.frag` multiplies
+  again. Then the shape kept its solid colour and was given `opacity`, with the dock's
+  hint, which is no glass, drawn by an instance of its own; with the rim that is one
+  instance again. The lock screen uses the same compiled shader and sets neither
+  `glass` nor `rim`: seen to draw solid that way (Qt warns of a uniform without a
+  property and leaves it 0), in the hidden compositor, with the lock screen's own
+  list of properties.
+- **Glass or solid is the user's choice** (2026-10-13: "a setting for transparent/blur
+  thing we should be able to enable/disable that"). `glass` in `theme.json`, next to the
+  theme (`Themes.glass`, on unless the file says `false`); `Theme.frameOpacity` is 0.5
+  with it and 1 without, and everything else already hung on that. Switched in the
+  settings window ("Appearance", a checkbox; `settings/Appearance.qml` changes that one
+  key and leaves the rest of the file), among the ">" actions ("Frame: solid", "Frame:
+  transparent and blurred") or with `qs ipc call theme setGlass on|off`. How transparent
+  was fixed at a half at first; then the user, over a pale wallpaper under a pale theme
+  where glass and solid look alike: "can we add a slider to the settings for how
+  transparent it is". `transparency` in the same file, a tenth to nine tenths, 0.5
+  without it (`Themes.transparency`; `Theme.frameOpacity` is what is left of 1); a
+  slider under the checkbox, which the shell follows while it is dragged, or
+  `qs ipc call theme setTransparency <percent>`. Not among the ">" actions. Tested: on the real shell by IPC, off and on again, the bar and the
+  top border measured in a screenshot (off: the theme's `bg` alone along the border;
+  on: hundreds of colours), `theme.json` written each time; the settings' checkbox
+  headless against a scratch config (a click writes the file, a change of the file
+  from outside moves the box). Switched on in a shell that had started solid, the
+  glass was dark grey (the user: "why does our transparent blur look so weird again"):
+  the theme's `bg` at half, the same over everything. The effect that casts the shadow
+  had been made while the shape it takes its shadow and its cut from was no layer yet,
+  and once that became one it drew the shape itself, black, under the glass. Started
+  as glass and switched off and on it had not (which was all that was tried at first).
+  So the glass's three parts are in one `Loader` now, made each time it is switched
+  on. Measured on the real shell, reloaded solid and reloaded glass, off and on twice:
+  the border and the bar light and following what is behind them each time. The
+  transparency: on the real shell by IPC at 10, 50 and 90 per cent, the bar's glass
+  measured over a darker part of the wallpaper (249, 243, 240 in red), and 500 taken
+  as 90; the slider headless (two moves in a row both written, a change of the file
+  from outside moving it, greyed with the glass off). Not tested: the slider dragged
+  in the real window. Not tested: the checkbox clicked in the real window,
+  the ">" action chosen in the launcher, the panels (launcher, AI panel, dock) looked
+  at while solid.
+- **The cards on the panels are glass too** (2026-10-13; the user, with a picture of
+  the launcher, arrows at its rail and its search field: "our glass effect should be
+  applied everywhere"). They were solid on the glass at first. A card has as much of
+  its colour as the glass has of its own (`Theme.card(colour)`: the colour at
+  `frameOpacity`, or as it is without glass), so what is behind the panel shows through
+  it as well, a little less, and the slider moves both. The launcher's rail and search
+  field, the palette's search field, a notification, a device in the KDE Connect panel,
+  and in the AI panel the composer, the follow-up field, the user's own messages, code
+  blocks and the cards that ask. The rail's small shadow is only there without glass:
+  it lies under the whole card and would show through; on glass the card has its
+  border. The fields to write in have such a border on glass as well
+  (`Theme.fieldBorder`: the two search fields, the AI panel's composer and follow-up):
+  the launcher's search field, glass without one, was a faint patch ending nowhere in
+  particular (the user: "this looks kina off/weird"). Seen: the launcher on the real
+  desktop, at 40 per cent, over a light window, before and after the border. Not seen:
+  any of the others.
+- **Not glass:** what marks a row (under the pointer, chosen), sliders and switches,
+  which are small and stay solid; the menus that are windows of their own (`MenuPopup`,
+  `ActionMenu`); the lock screen; the settings window.
+- **Dead ends:** `component X: Region { … }` inside `Frame.qml` ("X is not a type"),
+  hence the two files; `QT_QPA_PLATFORM=offscreen` draws no `MultiEffect` at all, so
+  the off-screen harness says nothing about any of this.
+- **A file replaced by another is no longer watched.** `sed -i` on `Theme.qml` wrote a
+  new file under the old name; the running shell did not reload for it, nor for any
+  later change to it, until it was restarted. Edit in place.
+- **Testing.** The whole frame was run where nobody sees it: `kwin_wayland --virtual`
+  in its own D-Bus session (see "Testing the lock screen without locking"), in it a
+  copy of `shell/` with `shell.qml` cut down to `Exclusions` and `Frame`, and with
+  stand-ins for `Themes`, `Setup`, `LoginScreen`, `Looks` and `ThemeExport` (the real
+  ones set the wallpaper and install things), `XDG_CONFIG_HOME` and `XDG_STATE_HOME`
+  in a scratch directory, and for something to blur a second Quickshell with one
+  `PanelWindow` on the background layer full of coloured squares and letters.
+  `spectacle` in that session photographs the virtual screen. Seen there, on Melange
+  Light: the border and the bar, the AI panel, the notch, the launcher, each blurred to
+  its edge and the shadow around it; and again with the rim, the notch and the
+  launcher's fillet at six and eight times their size, without a step. Seen on the
+  real desktop: the bar, blurred and light; two of the frame's inner corners and the
+  notch enlarged, with the rim. The lock screen itself was not looked at. Not seen: a dark theme, the palette, the notification list and its corner,
+  the side panel and the dock's hint on glass; how legible the bar's icons and the
+  panels' text are over a busy or a dark wallpaper.
+
+
+## Memory: no leak found, and no huge pages for the shell
+
+Looked at on 2026-10-13 (the user: "check if we might have any memory leaks", then "i
+want to know where the 200MB come from ... we should strieve to reduce memory usage as
+much as possible").
+
+- **No leak found.** Measured on the running shell, the anonymous memory 14 s after
+  each run: three minutes left alone, flat; 40 IPC queries, the glass switched off and
+  on 20 times, the launcher opened 10 times, six hot reloads, the AI panel 10 times,
+  the notification list and the calendar 10 times each: each within 2 MB of where it
+  began, most a little under. The theme switcher cost 23 MB the first five times and
+  nothing the next five; the clipboard's list 5 MB the first ten times and nothing in
+  the next forty. In the code: the two things made on the fly (`clipLister`,
+  `starter`) destroy themselves, the `busctl monitor` that runs for good is read line
+  by line, the notifications kept and the dock's order have a limit. Not tested:
+  notifications arriving (they would have gone into the user's own list), the theme
+  switcher looked through from end to end.
+- **But a freshly started shell had 400 MB, 268 MB of it heap,** where Quickshell with
+  an empty config and one window has 157 and 68. Of the heap only 83 MB were
+  allocations in use (jemalloc's own profiler, which Arch's build has:
+  `MALLOC_CONF=prof:true,lg_prof_interval:25,…` for one start of the unit, `jeprof`
+  for the dumps). The rest was not memory jemalloc had kept back (`dirty_decay_ms:0`
+  changed nothing) but **transparent huge pages**: CachyOS has them on for everyone
+  (`always`), and 145 MB of the shell's heap were in them, each 2 MB stretch that was
+  touched at all kept whole.
+- **So the shell's unit has `MemoryTHP=disable`** (systemd 260 and later; a file
+  beside the unit that systemd makes of the autostart entry,
+  `~/.config/systemd/user/app-kde\x2dquickshell\x2dshell@autostart.service.d/memory.conf`,
+  which `setup.sh` puts there, "Memory" in its report). Measured at 104 s after a
+  start, and again after the launcher was first opened:
+
+  | | total | heap | after the launcher: total | heap |
+  |---|---|---|---|---|
+  | as it was | 400 MB | 269 MB | 453 MB | 304 MB |
+  | `MALLOC_CONF=thp:never` (jemalloc's part only) | 312 MB | 182 MB | 332 MB | 194 MB |
+  | `MemoryTHP=disable` | 237 MB | 107 MB | 254 MB | 115 MB |
+
+  What the shell starts as its own child has no huge pages either; applications go
+  through `kstart` and are not its children.
+- **What is left, by who asked for it** (the 83 MB in use): the graphics driver 34 MB
+  (the frame's window and the four that reserve the edges: a further window is 4 MB and
+  seven threads, measured with empty ones), pictures 18 MB (icons: Kirigami's 8.5, the
+  task list's 4.5), QML itself 14 MB, Quickshell 6 MB. `QSG_RENDER_LOOP=basic` would
+  save about 5 MB and was left alone. Not looked into: the 1.4 GB the process had
+  once reached before all this (a hot reload has two configurations for a moment).
+
+## Rounded corners on every window, maximized ones too
+
+Asked for on 2026-10-13: with the gap between the frame and the windows a maximized
+window's square corners show against the desktop ("looks bad with our shell"). Two
+things in `kwin/`, built and switched on by `kwin/corners.sh` (`on`, `off`,
+`radius <px>`, `build`); both are built against the KWin installed and have to be
+built again after a Plasma update (`on` again).
+
+- **KWin's own radius, not an effect.** KWin clips a window's surface to a radius its
+  decoration gives it (`Window::setBorderRadius`, what rounds the bottom of a Breeze
+  window). No script can set it, so a small KWin plugin does (`kwin/roundcorners`): for
+  an application's window without a decoration's radius, not full screen, that draws
+  nothing outside its frame (a window with a shadow of its own would lose it). The
+  ShapeCorners effect, installed here and switched off, would have done all of it at
+  once; the user chose this ("i would like to try option 4").
+- **KWin does not clip a title bar it draws**, and Breeze draws a maximized one
+  square. So the shell has a Breeze of its own (`kwin/breeze`: `rounded.patch` on the
+  released sources of the installed version, fetched by `build.sh`, built beside the
+  installed Breeze as "Breeze (kde-quickshell)", reading Breeze's own settings): title
+  bar and bottom corners rounded when maximized or tiled too, the outline kept around
+  a maximized window, the decoration never called opaque (KWin left what is behind
+  the new corners unpainted: black), and the shadows made again when the radius
+  changes.
+- **One radius for both**: `Radius` in the group `KDEQuickshellRoundCorners` of
+  `kwinrc`, Breeze's own 5 px without it.
+- **A window that draws its own title bar with square corners and its own shadow**
+  (Helium and Chromium, not maximized; the user: "can we also make it so that not
+  maximized windows also have the rounded corners if they dont already have it") is
+  given the shell's Breeze without a title bar: the corners, and Breeze's shadow and
+  outline in place of its own. Which window that is, it says itself, with the part of
+  its surface it calls opaque: if that reaches into a corner (looked at 2 px in:
+  Chromium leaves a pixel around its window out), the corners are square. Decided
+  once what led there is done with, since the region and the size change one after
+  the other. The plugin marks the window (`kdeQuickshellNoTitleBar`, a property on
+  KWin's window, which is the decoration's parent) and asks KWin for a decoration
+  (`setDecorationPolicy`); the Breeze reads the mark.
+- **Tested** in a compositor nobody sees (`kwin_wayland --virtual` in its own D-Bus
+  session, the plugins from `QT_PLUGIN_PATH`, a magenta background, the installed
+  ShapeCorners switched off there), with Helium, KWrite and a GTK window (zenity):
+  maximized and not, radius 5 and 12, at scale 1 and once at 1.333; the radius changed
+  and the decoration switched to and fro while running; the plugin unloaded and
+  loaded again. Not maximized, KWrite under this Breeze is the installed Breeze's
+  picture to the pixel. On the real desktop the user: "seems to work well" (the first
+  version), and after the next login nothing more was said of it. Not tested: T3
+  Code, XWayland and tiled windows, the Breeze's settings page with this plugin, a
+  dark theme.

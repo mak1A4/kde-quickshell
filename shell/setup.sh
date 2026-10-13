@@ -120,6 +120,28 @@ EOF
 fi
 [ -e "$autostart" ] && : > "$state/autostart-made"
 
+# The unit systemd makes of that entry gets no transparent huge pages. Where
+# the system gives them to everyone ("always", as CachyOS does), every 2 MB
+# stretch of the shell's heap that is touched at all is kept whole, and the
+# heap is many small things: measured, 269 MB of it at the start with, 107 MB
+# without. systemd does it (MemoryTHP=, from version 260; an older one says it
+# does not know the line and goes on). It counts from the shell's next start.
+memory="$config/systemd/user/app-kde\\x2dquickshell\\x2dshell@autostart.service.d/memory.conf"
+if [ ! -e "$autostart" ]; then
+    :
+elif grep -qs '^MemoryTHP=disable' "$memory"; then
+    say ok memory "Memory" "no huge pages for the shell"
+else
+    mkdir -p "$(dirname "$memory")"
+    cat > "$memory" << EOF
+# kde-quickshell (setup.sh): no transparent huge pages for the shell.
+[Service]
+MemoryTHP=disable
+EOF
+    have systemctl && systemctl --user daemon-reload
+    say fixed memory "Memory" "no huge pages for the shell, from its next start ($memory)"
+fi
+
 # ---- what Plasma loads of ours ---------------------------------------------
 
 # Plasma refuses a package whose files are links to somewhere else (as a
@@ -261,7 +283,7 @@ connected nvim "Neovim" nvim.lua "have its config run ~/.local/state/kde-quicksh
 
 # VS Code has the themes' colour themes from extensions. Looked at once, and
 # again when the list here changes: asking VS Code takes a second or two.
-extensions="catppuccin.catppuccin-vsc enkia.tokyo-night jdinhlife.gruvbox arcticicestudio.nord-visual-studio-code sainnhe.everforest qufiwefefwoyn.kanagawa mvllow.rose-pine dracula-theme.theme-dracula"
+extensions="catppuccin.catppuccin-vsc enkia.tokyo-night jdinhlife.gruvbox arcticicestudio.nord-visual-studio-code sainnhe.everforest qufiwefefwoyn.kanagawa mvllow.rose-pine dracula-theme.theme-dracula teabyii.ayu github.github-vscode-theme akamud.vscode-theme-onelight akamud.vscode-theme-onedark cocopon.iceberg-theme"
 if have code; then
     if ! wanted vscode; then
         say note code "VS Code" "extensions for the themes are switched off in setup.json"

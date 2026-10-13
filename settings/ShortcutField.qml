@@ -13,6 +13,8 @@ KQuickControls.KeySequenceItem {
     required property var action
 
     multiKeyShortcutsAllowed: false
+    // also a modifier on its own: Meta, for the launcher
+    patterns: KQuickControls.ShortcutPattern.Modifier | KQuickControls.ShortcutPattern.ModifierAndKey
     checkForConflictsAgainst: KQuickControls.ShortcutType.None
     // a new combination, or the clear button
     onKeySequenceModified: shortcuts.request(action, String(keySequence))

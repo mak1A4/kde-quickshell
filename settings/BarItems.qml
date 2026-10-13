@@ -128,8 +128,15 @@ Scope {
         return Symbols.size(icon, square);
     }
 
+    // whether that is the item's own icon, drawn in one colour
+    function tinted(icon: string): bool {
+        return Symbols.tinted(icon);
+    }
+
     // "mail-unread-symbolic", "Tabler: mail", a file's name
     function describe(icon: string): string {
+        if (tinted(icon))
+            return "its own icon in one colour";
         if (icon.startsWith("tabler/"))
             return "Tabler: " + icon.slice(7);
         return icon.replace(/^.*\//, "");

@@ -26,8 +26,19 @@ Item {
     property real h: 0
     // room on the free sides for the overshoot
     readonly property real slack: 36
-    // left edge, on a whole device pixel (see "Sizes" in docs/decisions.md)
-    readonly property real leftX: Math.round((centreX - w / 2) / 3) * 3
+    // The left edge. At the width the panel comes to rest at it is on a
+    // whole device pixel (see "Sizes" in docs/decisions.md); while the width
+    // is on its way there, the edge is as far off a pixel as it will need to
+    // be at the end, and no further. Put on a pixel at every step, the left
+    // edge went in jumps of 3 px while the width changed evenly, and the
+    // right edge, which is the left one and the width, went forth and back
+    // by as much: a panel growing out of the notch came to rest in jerks.
+    readonly property real restWidth: open ? contentWidth : w
+    readonly property real leftX: centreX - w / 2 + Math.round((centreX - restWidth / 2) / 3) * 3 - (centreX - restWidth / 2)
+
+    // how far the panel is above its place, on its way out or back in (0 or
+    // less; 0 at rest), for what moves with it without being in it
+    readonly property real slide: panel.y
 
     // the part that is out, for the frame's input region
     readonly property rect area: hidden ? Qt.rect(0, 0, 0, 0) : Qt.rect(leftX, edgeY, w, Math.max(0, panel.y + h))

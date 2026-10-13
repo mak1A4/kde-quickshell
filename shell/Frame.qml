@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Wayland
 import QtQuick
 import QtQuick.Effects
+import qs.ai
 import qs.notifications
 import qs.palette
 import qs.picker
@@ -14,9 +15,11 @@ PanelWindow {
     id: root
 
     readonly property real innerRight: width - Theme.barWidth
+    // the AI panel's content, once loaded, is kept for the shell's life
+    property bool aiEverOpened: false
     readonly property bool popoutOpen: Popouts.current !== "" && within(Popouts.anchorItem, bar)
     // a popout, the launcher or the palette: something that a click elsewhere dismisses
-    readonly property bool modal: popoutOpen || dock.launcherOpen || commandPalette.showing || notificationCorner.listOpen
+    readonly property bool modal: popoutOpen || dock.launcherOpen || commandPalette.showing || aiPanel.showing || notificationCorner.listOpen
 
     // Hovered item with a hint. A hint waits Theme.hintDelay before it first
     // appears; once one is showing, moving to another item switches at once.
@@ -99,7 +102,7 @@ PanelWindow {
     // stayed the active window after the list had closed, and the window
     // being worked in had to be clicked to type again. KWin gives the
     // keyboard back when an exclusive surface lets go.
-    WlrLayershell.keyboardFocus: dock.launcherOpen || commandPalette.showing || notificationCorner.listOpen ? WlrKeyboardFocus.Exclusive : (popoutOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
+    WlrLayershell.keyboardFocus: dock.launcherOpen || commandPalette.showing || aiPanel.showing || notificationCorner.listOpen ? WlrKeyboardFocus.Exclusive : (popoutOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
 
     // KWin leaves this surface the active window when it stops asking for the
     // keyboard, so the window that had it before is activated again
@@ -169,6 +172,15 @@ PanelWindow {
             intersection: Intersection.Subtract
         }
 
+        // the notch with the number of threads at work is clicked on
+        Region {
+            x: aiPanel.area.x
+            y: aiPanel.area.y
+            width: aiPanel.area.width
+            height: aiPanel.area.height
+            intersection: Intersection.Subtract
+        }
+
         // notification popups take the pointer too
         Region {
             x: notificationPanel.area.x
@@ -187,45 +199,193 @@ PanelWindow {
             Popouts.close();
             Launcher.hide();
             CommandPalette.hide();
+            Ai.hide();
             Notifications.listOpen = false;
         }
     }
 
     // Border and panel backgrounds, as one merged shape (see the shader),
-    // with a soft shadow onto the windows below.
+    // with a soft shadow onto the windows below. The Loader that makes one
+    // says its colour (`tint`) and how far it is glass (`glassy`, 0 for the
+    // solid shape).
+    Component {
+        id: shape
+
+        ShaderEffect {
+            fragmentShader: Qt.resolvedUrl("file://" + Quickshell.shellPath("shaders/frame.frag.qsb"))
+
+            readonly property vector2d resolution: Qt.vector2d(width, height)
+            readonly property vector4d inner: {
+                const hole = root.hole;
+                return Qt.vector4d((hole.x + hole.z) / 2, (hole.y + hole.w) / 2, (hole.z - hole.x) / 2, (hole.w - hole.y) / 2);
+            }
+            readonly property real innerRadius: Theme.frameRounding
+            readonly property real cornerRadius: notificationCorner.corner
+            readonly property real panelRadius: Theme.panelRounding
+            readonly property real smoothing: Theme.panelSmoothing
+            readonly property color color: parent.tint
+            readonly property vector4d panel0: dock.blob
+            readonly property vector4d panel1: sidePanel.blob
+            readonly property vector4d panel2: commandPalette.blob
+            readonly property vector4d panel3: notificationPanel.blob
+            readonly property vector4d panel4: notificationCorner.blob
+            readonly property vector4d panel5: aiPanel.blob
+            readonly property vector4d bubble: dockHint.blob
+            readonly property real bubbleRadius: 12
+            readonly property color bubbleColor: Theme.tooltipBg
+            readonly property real bubbleOpacity: dockHint.opacity
+            readonly property real glass: parent.glassy
+            readonly property real rim: Theme.glassRim
+        }
+    }
+
+    // what the border leaves free: left, top, right, bottom
+    readonly property vector4d hole: Qt.vector4d(Theme.frameBorder, Theme.frameBorder, innerRight, height - Theme.frameBorder)
+
+    // the solid frame, casting its shadow
     Item {
         anchors.fill: parent
-        layer.enabled: true
+        visible: !Theme.glass
+        layer.enabled: !Theme.glass
         layer.effect: MultiEffect {
             shadowEnabled: true
             blurMax: 15
             shadowColor: Qt.rgba(0, 0, 0, Theme.shadowOpacity)
         }
 
-        ShaderEffect {
-            anchors.fill: parent
-            fragmentShader: Qt.resolvedUrl("file://" + Quickshell.shellPath("shaders/frame.frag.qsb"))
+        Loader {
+            property color tint: Theme.bg
+            property real glassy: 0
 
-            readonly property vector2d resolution: Qt.vector2d(width, height)
-            readonly property vector4d inner: {
-                const left = Theme.frameBorder, top = Theme.frameBorder;
-                const right = root.innerRight, bottom = root.height - Theme.frameBorder;
-                return Qt.vector4d((left + right) / 2, (top + bottom) / 2, (right - left) / 2, (bottom - top) / 2);
+            anchors.fill: parent
+            active: !Theme.glass
+            sourceComponent: shape
+        }
+    }
+
+    // ---- glass ---------------------------------------------------------------
+    //
+    // With `Theme.frameOpacity` below 1 the shape lets that much of what is
+    // behind it through (the shader's `glass`), and the compositor is asked
+    // to blur what is behind it (ext-background-effect-v1, through
+    // Quickshell's BackgroundEffect: the protocol is Wayland's own, not
+    // KDE's). Two things follow.
+    //
+    // The shadow cannot be cast the same way: it lies under the whole shape
+    // as well as around it, and through glass it would be seen, a grey film
+    // on everything. So the shadow is made from the shape drawn solid, which
+    // is not shown itself, and the shape is cut out of it again.
+    //
+    // And the compositor has to be told where to blur, as rectangles and
+    // ellipses, which the shape is not quite: see `blur` below.
+    //
+    // All of it is made when the glass is switched on, and gone when it is
+    // switched off (Themes.glass): left in place and only shown again, the
+    // effect no longer cut the shape out, and drew it, black, under the
+    // glass.
+    Loader {
+        anchors.fill: parent
+        active: Theme.glass
+        sourceComponent: Item {
+            Item {
+                id: solid
+
+                anchors.fill: parent
+                visible: false
+                layer.enabled: true
+
+                Loader {
+                    property color tint: "black"
+                    property real glassy: 0
+
+                    anchors.fill: parent
+                    sourceComponent: shape
+                }
             }
-            readonly property real innerRadius: Theme.frameRounding
-            readonly property real cornerRadius: notificationCorner.corner
-            readonly property real panelRadius: Theme.panelRounding
-            readonly property real smoothing: Theme.panelSmoothing
-            readonly property color color: Theme.bg
-            readonly property vector4d panel0: dock.blob
-            readonly property vector4d panel1: sidePanel.blob
-            readonly property vector4d panel2: commandPalette.blob
-            readonly property vector4d panel3: notificationPanel.blob
-            readonly property vector4d panel4: notificationCorner.blob
-            readonly property vector4d bubble: dockHint.blob
-            readonly property real bubbleRadius: 12
-            readonly property color bubbleColor: Theme.tooltipBg
-            readonly property real bubbleOpacity: dockHint.opacity
+
+            MultiEffect {
+                anchors.fill: parent
+                source: solid
+                // as large as the frame, so that the cut lies on it exactly
+                autoPaddingEnabled: false
+                shadowEnabled: true
+                blurMax: 15
+                shadowColor: Qt.rgba(0, 0, 0, Theme.shadowOpacity)
+                maskEnabled: true
+                maskSource: solid
+                maskInverted: true
+                // The cut is as soft as the shape's own edge: where the shape half
+                // covers a pixel, half the shadow stays. Cut hard (the default: gone
+                // wherever there is any of the shape), the shadow ended in steps a
+                // pixel outside every curve, with a light seam between it and the
+                // glass: "anything rounded looks jagged".
+                maskThresholdMin: 0.5
+                maskSpreadAtMin: 1
+            }
+
+            Loader {
+                property color tint: Theme.bg
+                property real glassy: 1 - Theme.frameOpacity
+
+                anchors.fill: parent
+                sourceComponent: shape
+            }
+        }
+    }
+
+    // Where the compositor blurs: the whole surface, less the hole, and
+    // each panel put back. (The dock's hint is not glass and is left out.)
+    BackgroundEffect.blurRegion: Theme.glass ? blur : null
+
+    Region {
+        id: blur
+
+        width: root.width
+        height: root.height
+
+        Region {
+            intersection: Intersection.Subtract
+            x: root.hole.x
+            y: root.hole.y
+            width: root.hole.z - root.hole.x
+            height: root.hole.w - root.hole.y
+            // Regions are whole pixels, so on a curve the blur ends in
+            // steps. They are kept under the glass's solid rim, where they
+            // do not show, by blurring a little less than the shape at every
+            // curve: here a hole with tighter corners, for a panel wider
+            // ones and fillets a pixel narrower (BlurBlob.qml).
+            radius: Math.max(0, Math.floor(Theme.frameRounding) - 1)
+            bottomLeftRadius: Math.max(0, Math.floor(notificationCorner.corner) - 1)
+        }
+
+        BlurBlob {
+            blob: dock.blob
+            hole: root.hole
+        }
+
+        BlurBlob {
+            blob: sidePanel.blob
+            hole: root.hole
+        }
+
+        BlurBlob {
+            blob: commandPalette.blob
+            hole: root.hole
+        }
+
+        BlurBlob {
+            blob: notificationPanel.blob
+            hole: root.hole
+        }
+
+        BlurBlob {
+            blob: notificationCorner.blob
+            hole: root.hole
+        }
+
+        BlurBlob {
+            blob: aiPanel.blob
+            hole: root.hole
         }
     }
 
@@ -236,8 +396,9 @@ PanelWindow {
         screen: root.screen
     }
 
-    // The command palette, hanging from the top edge. Its content exists
-    // only while open (and until it has faded out).
+    // The panel hanging from the top edge: the clipboard history or the
+    // theme switcher (CommandPalette). Its content exists only while open
+    // (and until it has faded out).
     TopPanel {
         id: commandPalette
 
@@ -281,6 +442,92 @@ PanelWindow {
                 Anim {
                     kind: Anim.Fade
                 }
+            }
+        }
+    }
+
+    // The AI panel (T3 Code, natively; see Ai.qml), also hanging from the top
+    // edge but wider, and of two sizes: its two pages take turns. Its
+    // content stays loaded once first shown, so what is written in the
+    // composer and where a thread was scrolled to survive closing.
+    //
+    // Closed, it is still out a little while threads are at work or it is
+    // the user's turn in one: a notch in the top edge's middle with the two
+    // numbers in it (ai/Notch.qml), which the panel grows out of when it
+    // opens. The notch steps aside for the palette, which hangs in the same
+    // place.
+    TopPanel {
+        id: aiPanel
+
+        readonly property bool showing: Ai.open && (Ai.screen === null || Ai.screen === root.screen)
+        readonly property bool notch: !showing && aiNotch.telling && !commandPalette.showing
+
+        anchors.fill: parent
+        edgeY: Theme.frameBorder
+        centreX: (Theme.frameBorder + root.innerRight) / 2
+        open: showing || notch
+        contentWidth: showing ? (aiLoader.item?.implicitWidth ?? 720) : aiNotch.implicitWidth
+        contentHeight: showing ? (aiLoader.item?.implicitHeight ?? 300) + aiLoader.y : aiNotch.implicitHeight
+        focus: showing
+        Keys.onEscapePressed: Ai.hide()
+
+        // clicks on the panel must not reach the dismiss area underneath
+        MouseArea {
+            anchors.fill: parent
+            enabled: aiPanel.showing
+            acceptedButtons: Qt.AllButtons
+        }
+
+        Loader {
+            id: aiLoader
+
+            // Made when first shown, and already while the notch is out: the
+            // panel grows out of the notch to the content's size, and a
+            // content that is only then being made has none yet. It grew
+            // towards a guess and turned round.
+            active: aiPanel.showing || root.aiEverOpened || aiNotch.telling
+            // Under the notch's dots, which stay where they are when the
+            // panel opens: its content begins a little below where the
+            // notch ends, which is close under its dots.
+            y: Theme.notchHeight + 3 - (item?.margin ?? 12)
+            enabled: aiPanel.showing
+            opacity: aiPanel.showing ? 1 : 0
+            visible: opacity > 0
+            sourceComponent: AiPanel {}
+
+            // not in the same breath: `active` is still being worked out
+            onLoaded: Qt.callLater(() => root.aiEverOpened = true)
+
+            Behavior on opacity {
+                SwapFade {
+                    incoming: aiPanel.showing
+                }
+            }
+        }
+    }
+
+    // The notch's dots. Not in the panel, which keeps what is in it off the
+    // border: the dots reach up into the border (ai/Notch.qml), so that the
+    // notch need not be as deep as they are high. In the panel's middle, and
+    // moving with it as it comes out and goes back.
+    Notch {
+        id: aiNotch
+
+        x: aiPanel.leftX + (aiPanel.w - width) / 2
+        y: aiPanel.edgeY + aiPanel.slide
+        opacity: aiPanel.notch || aiPanel.showing ? 1 : 0
+        visible: opacity > 0
+        // on the thread that waits, if it is the only one that does
+        onClicked: {
+            const waiting = Ai.allThreads.filter(thread => Ai.kindOf(thread) === "waiting");
+            if (waiting.length === 1)
+                Ai.openThread(waiting[0].id);
+            Ai.show(root.screen);
+        }
+
+        Behavior on opacity {
+            SwapFade {
+                incoming: aiPanel.notch || aiPanel.showing
             }
         }
     }
@@ -629,9 +876,14 @@ PanelWindow {
     // everything and takes the hovering. A press closes the menu and goes on
     // to what is under it, so a right click on another icon opens that one's
     // menu. Not a press on the icon the menu belongs to: that icon closes it.
+    //
+    // Not there at all otherwise, and not merely disabled: a MouseArea has an
+    // arrow for a pointer of its own, and the topmost one under the pointer
+    // decides, disabled or not. Disabled, this one took the pointing hand
+    // from everything on the frame.
     MouseArea {
         anchors.fill: parent
-        enabled: Popouts.menuOpen
+        visible: Popouts.menuOpen
         hoverEnabled: true
         acceptedButtons: Qt.AllButtons
         onPressed: mouse => {

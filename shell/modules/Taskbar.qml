@@ -311,7 +311,7 @@ RowLayout {
             }
 
             Behavior on color {
-                ColorAnim {}
+                HoverAnim {}
             }
 
             Icon {

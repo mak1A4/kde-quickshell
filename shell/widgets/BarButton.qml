@@ -44,7 +44,7 @@ Rectangle {
     }
 
     Behavior on color {
-        ColorAnim {}
+        HoverAnim {}
     }
 
     Behavior on shownPart {

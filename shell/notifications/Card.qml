@@ -162,7 +162,7 @@ Rectangle {
 
     implicitHeight: content.implicitHeight + Theme.padding * 2
     radius: 12
-    color: Theme.surface
+    color: Theme.card(Theme.surface)
 
     Timer {
         interval: root.timeout

@@ -68,6 +68,10 @@ PopupWindow {
                     anchors.fill: parent
                     radius: Theme.radius
                     color: mouse.containsMouse ? Theme.surfaceHover : Theme.none
+
+                    Behavior on color {
+                        HoverAnim {}
+                    }
                 }
 
                 RowLayout {

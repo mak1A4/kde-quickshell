@@ -92,7 +92,7 @@ Item {
                 Layout.fillWidth: true
                 implicitHeight: card.implicitHeight + Theme.padding * 2
                 radius: 12
-                color: Theme.surface
+                color: Theme.card(Theme.surface)
 
                 ColumnLayout {
                     id: card

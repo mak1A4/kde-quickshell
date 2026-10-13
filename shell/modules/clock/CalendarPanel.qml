@@ -256,7 +256,7 @@ Item {
                 }
 
                 Behavior on color {
-                    ColorAnim {}
+                    HoverAnim {}
                 }
 
                 Label {
@@ -397,9 +397,7 @@ Item {
                                     color: cell.isToday ? Theme.accent : (cell.isPicked ? Theme.surfaceActive : (mouse.containsMouse ? Theme.surfaceHover : Theme.none))
 
                                     Behavior on color {
-                                        ColorAnim {
-                                            duration: Theme.followDuration
-                                        }
+                                        HoverAnim {}
                                     }
                                 }
 

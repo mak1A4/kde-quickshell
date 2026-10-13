@@ -4,7 +4,8 @@
 #
 #   hotkeys.sh register <component> <name> [<action> <action name> <default key>]...
 #       Makes the actions known to KDE and active. Keys are Qt key numbers,
-#       0 for none.
+#       0 for none. An action of the component that is not among them is
+#       taken out of KDE: the shell had it once and has it no longer.
 #   hotkeys.sh keep <shell pid> <component> <name> [<action> ...]...
 #       Stays until the shell's process is gone, then gives the keys back.
 #       Registers and applies the overrides first.
@@ -31,17 +32,35 @@ accel() {
     busctl --user call org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel "$@"
 }
 
+# the actions KDE has for a component, one per line
+actions_of() {
+    path=/component/$(printf %s "$1" | tr -c 'A-Za-z0-9' '_')
+    busctl --user call org.kde.kglobalaccel "$path" org.kde.kglobalaccel.Component shortcutNames 2> /dev/null | tr -d '"' | cut -d' ' -f3- | tr ' ' '\n'
+}
+
 # Per action: make it known, tell KDE its default key (flag 8), and mark it
 # present (flag 2), which loads the stored key or, for an action KDE sees for
 # the first time, takes the one given.
+#
+# Then what KDE still has of an earlier version goes: an action that is no
+# longer registered would keep its key, with nobody to answer it. Its key is
+# free again, and what it overrode has its own back.
 register() {
     component=$1; name=$2; shift 2
+    known=
     while [ $# -ge 3 ]; do
         if [ "$3" = 0 ]; then keys=0; else keys="1 4 $3 0 0 0"; fi
         accel doRegister as 4 "$component" "$1" "$name" "$2"
         accel setShortcutKeys 'asa(ai)u' 4 "$component" "$1" "$name" "$2" $keys 8 > /dev/null
         accel setShortcutKeys 'asa(ai)u' 4 "$component" "$1" "$name" "$2" $keys 2 > /dev/null
+        known="$known$1
+"
         shift 3
+    done
+    for action in $(actions_of "$component"); do
+        printf '%s' "$known" | grep -qxF -- "$action" && continue
+        accel unregister ss "$component" "$action" > /dev/null
+        forget "$action" ""
     done
 }
 
@@ -66,8 +85,7 @@ apply_all() {
 
 # everything of ours inactive, every owner back on
 release_all() {
-    path=/component/$(printf %s "$1" | tr -c 'A-Za-z0-9' '_')
-    for action in $(busctl --user call org.kde.kglobalaccel "$path" org.kde.kglobalaccel.Component shortcutNames | tr -d '"' | cut -d' ' -f3-); do
+    for action in $(actions_of "$1"); do
         accel setInactive as 4 "$1" "$action" "" ""
     done
     [ -f "$overrides" ] || return 0

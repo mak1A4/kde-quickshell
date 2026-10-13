@@ -9,6 +9,8 @@ RowLayout {
 
     property string key
     property string text
+    // behind the key; another where the hint stands on this colour itself
+    property color keyColor: Theme.surface
 
     spacing: Theme.spacing
     visible: text !== ""
@@ -17,7 +19,7 @@ RowLayout {
         implicitWidth: Math.max(18, keyLabel.implicitWidth + 9)
         implicitHeight: 18
         radius: 4.5
-        color: Theme.surface
+        color: hint.keyColor
 
         Label {
             id: keyLabel

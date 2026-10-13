@@ -221,13 +221,13 @@ Item {
 
                 Behavior on size {
                     Anim {
-                        kind: Anim.Fade
+                        kind: Anim.Hover
                     }
                 }
 
                 Behavior on opacity {
                     Anim {
-                        kind: Anim.Fade
+                        kind: Anim.Hover
                     }
                 }
             }
@@ -280,17 +280,17 @@ Item {
 
             Behavior on size {
                 Anim {
-                    kind: Anim.Fade
+                    kind: Anim.Hover
                 }
             }
 
             Behavior on color {
-                ColorAnim {}
+                HoverAnim {}
             }
 
             Behavior on opacity {
                 Anim {
-                    kind: Anim.Fade
+                    kind: Anim.Hover
                 }
             }
         }

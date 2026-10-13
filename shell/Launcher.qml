@@ -3,18 +3,23 @@ pragma Singleton
 import Quickshell
 import Quickshell.Io
 import QtQuick
-import "launcher/calc.js" as Calc
-import "launcher/search.js" as Search
 
-// The app launcher's state and logic; the panel is launcher/LauncherPanel.qml,
-// shown by the Dock. Open it from the dock's first button or with
+// The launcher's state and logic; the panel is launcher/LauncherPanel.qml,
+// shown by the Dock. Open it from the dock's first button, with its keys
+// (Hotkeys.qml) or with
 //   qs ipc -p <config> call launcher toggle
-// (bind that to a key in System Settings > Shortcuts).
+// or with a query already typed: `call launcher search "> "`.
 //
 // With nothing typed it is a menu with what KDE's own has: the favourites,
-// all applications or one category of them, the places, the session. Typing
-// searches applications. ">" lists session actions, "=" calculates; plain
-// arithmetic is recognised without the "=".
+// all applications or one category of them, the places, the session.
+// Typing searches as KRunner does, with every runner plugin enabled in
+// System Settings > Search > KRunner: apps, windows, settings, files,
+// calculator, units, web shortcuts and so on. ">" lists the shell's own
+// actions.
+//
+// Menu and search were two panels until 2026-10-12: this one, which searched
+// applications by itself, and a command palette from the top edge with
+// KRunner's search.
 Singleton {
     id: root
 
@@ -23,12 +28,14 @@ Singleton {
     property var screen: null
     property string query: ""
 
-    function show(onScreen) {
+    function show(onScreen, text) {
         screen = onScreen ?? Quickshell.screens[0] ?? null;
         Popouts.close();
         CommandPalette.hide();
+        Ai.hide();
         Notifications.listOpen = false;
-        query = "";
+        runner.active = true;
+        query = text ?? "";
         category = "favorites";
         open = true;
     }
@@ -72,6 +79,15 @@ Singleton {
             root.hide();
         }
 
+        function search(text: string): void {
+            root.show(null, text);
+        }
+
+        // the titles of what typing has found
+        function results(): string {
+            return root.results.map(row => row.title).join("\n");
+        }
+
         // the menu, for scripts and tests: which list is shown, and what is in it
         function category(key: string): string {
             if (!root.categories.some(category => category.key === key))
@@ -97,22 +113,20 @@ Singleton {
 
     // ---- applications ----------------------------------------------------
 
-    // lower-cased text of each application, built once per change of the list
-    readonly property var apps: DesktopEntries.applications.values.filter(entry => !entry.noDisplay).map(entry => ({
-                entry: entry,
-                fields: {
-                    id: entry.id.toLowerCase(),
-                    name: entry.name.toLowerCase(),
-                    generic: entry.genericName.toLowerCase(),
-                    comment: entry.comment.toLowerCase(),
-                    keywords: String(entry.keywords).toLowerCase()
-                }
-            }))
+    readonly property var apps: DesktopEntries.applications.values.filter(entry => !entry.noDisplay)
 
     // ---- the menu: favourites, categories, places -------------------------
 
     // what is listed while nothing is typed: the key of one of `categories`
     property string category: "favorites"
+
+    // An icon of the rail: one of the Tabler glyphs in icons/tabler
+    // (tools/tabler.sh fetches what is named here). One set, drawn alike,
+    // for the fourteen that stand in a column; the icon theme's are of
+    // several hands, and its "other" is three dots.
+    function glyph(name: string): string {
+        return Quickshell.shellPath("icons/tabler/" + name + ".svg");
+    }
 
     // KDE's menu, as far as it is a matter of categories: the main
     // categories a desktop entry can name (freedesktop's), under the names
@@ -121,61 +135,61 @@ Singleton {
         {
             key: "development",
             title: "Development",
-            icon: "applications-development-symbolic",
+            icon: glyph("code"),
             match: ["Development"]
         },
         {
             key: "education",
             title: "Education",
-            icon: "applications-education-symbolic",
+            icon: glyph("school"),
             match: ["Education", "Science"]
         },
         {
             key: "games",
             title: "Games",
-            icon: "applications-games-symbolic",
+            icon: glyph("device-gamepad-2"),
             match: ["Game"]
         },
         {
             key: "graphics",
             title: "Graphics",
-            icon: "applications-graphics-symbolic",
+            icon: glyph("palette"),
             match: ["Graphics"]
         },
         {
             key: "internet",
             title: "Internet",
-            icon: "applications-internet-symbolic",
+            icon: glyph("world"),
             match: ["Network"]
         },
         {
             key: "multimedia",
             title: "Multimedia",
-            icon: "applications-multimedia-symbolic",
+            icon: glyph("movie"),
             match: ["AudioVideo", "Audio", "Video"]
         },
         {
             key: "office",
             title: "Office",
-            icon: "applications-office-symbolic",
+            icon: glyph("briefcase"),
             match: ["Office"]
         },
         {
             key: "system",
             title: "System",
-            icon: "applications-system-symbolic",
+            icon: glyph("settings"),
             match: ["System", "Settings"]
         },
         {
             key: "utilities",
             title: "Utilities",
-            icon: "applications-utilities-symbolic",
+            icon: glyph("tool"),
             match: ["Utility", "Accessibility"]
         }
     ]
 
     // every application, by name
-    readonly property var sorted: apps.map(app => app.entry).sort((a, b) => a.name.localeCompare(b.name))
+    readonly property var sorted: apps.slice().sort((a, b) => a.name.localeCompare(b.name))
 
     // The favourites, in their order; one whose application is gone is
     // left out (and kept in the list: it may be installed again).
@@ -194,7 +208,7 @@ Singleton {
             {
                 key: "all",
                 title: "All Applications",
-                icon: "applications-all-symbolic",
+                icon: glyph("layout-grid"),
                 entries: sorted
             }
         ];
@@ -216,35 +230,42 @@ Singleton {
             list.push({
                 key: "other",
                 title: "Other",
-                icon: "applications-other-symbolic",
+                icon: glyph("apps"),
                 entries: rest
             });
         return list;
     }
 
     // Everything there is to choose between, in the order it is shown:
-    // [{ key, title, icon }]. The favourites, the applications by group,
-    // and last the two that are not applications.
+    // [{ key, title, icon, part }]. The favourites, the applications by
+    // group, and last the two that are not applications. `part` is which
+    // of the rail's three groups it stands in: "first" for the two lists
+    // that are not a category, "apps" for the categories, "last" for what
+    // is not applications.
     readonly property var categories: [
         {
             key: "favorites",
             title: "Favorites",
-            icon: "starred-symbolic"
+            icon: glyph("star"),
+            part: "first"
         }
     ].concat(grouped.map(group => ({
                 key: group.key,
                 title: group.title,
-                icon: group.icon
+                icon: group.icon,
+                part: group.key === "all" ? "first" : "apps"
             }))).concat([
         {
             key: "places",
             title: "Places",
-            icon: "folder-symbolic"
+            icon: glyph("folder"),
+            part: "last"
         },
         {
             key: "session",
             title: "Session",
-            icon: "system-shutdown-symbolic"
+            icon: glyph("power"),
+            part: "last"
         }
     ])
 
@@ -380,48 +401,6 @@ Singleton {
         onLoaded: root.placesText = text()
     }
 
-    // ---- usage: how often and how recently each app was started here -----
-
-    // id -> { count, last (ms since epoch) }
-    property var usage: ({})
-
-    FileView {
-        id: usageFile
-
-        path: Quickshell.statePath("launcher-usage.json")
-        blockLoading: true
-        // a missing file on first run is expected
-        printErrors: false
-        onLoaded: {
-            try {
-                root.usage = JSON.parse(text());
-            } catch (error) {
-                console.warn("Launcher: ignoring unreadable usage file:", error);
-                root.usage = {};
-            }
-        }
-    }
-
-    // Launch count, halved for every two weeks since the last launch, so old
-    // favourites fade and recent ones rise.
-    function frecency(id, now) {
-        const record = usage[id];
-        if (!record)
-            return 0;
-        const days = (now - record.last) / 86400000;
-        return record.count * Math.pow(0.5, days / 14);
-    }
-
-    function recordLaunch(id) {
-        const next = Object.assign({}, usage);
-        next[id] = {
-            count: (usage[id]?.count ?? 0) + 1,
-            last: Date.now()
-        };
-        usage = next;
-        usageFile.setText(JSON.stringify(next));
-    }
-
     // ---- launching -------------------------------------------------------
 
     // Through KDE (kstart): the app gets its own systemd scope, startup
@@ -449,7 +428,6 @@ Singleton {
     }
 
     function launch(entry) {
-        recordLaunch(entry.id);
         starter.createObject(root, { entry: entry });
         LastWindow.expectWindow();
         hide();
@@ -470,7 +448,7 @@ Singleton {
             })).concat([
         {
             title: "Shell settings",
-            subtitle: "Shortcuts for the palette and the launcher",
+            subtitle: "Shortcuts, and what the bar shows",
             icon: "configure-symbolic",
             settings: true
         },
@@ -491,6 +469,12 @@ Singleton {
             subtitle: Themes.browsers === "system" ? "The shell sets the theme's colour by policy; the browser's own theme setting is locked" : "The shell stops setting it; choose \"Use Qt\" in the browser's appearance settings",
             icon: "internet-web-browser-symbolic",
             browsers: Themes.browsers === "system" ? "policy" : "system"
+        },
+        {
+            title: Themes.glass ? "Frame: solid" : "Frame: transparent and blurred",
+            subtitle: Themes.glass ? "The frame and its panels in the theme's colour, nothing showing through" : "Glass: what is behind the frame and its panels shows through, blurred",
+            icon: "blur-symbolic",
+            glass: Themes.glass ? "off" : "on"
         },
         {
             title: "Check the shell's setup",
@@ -521,75 +505,109 @@ Singleton {
                 background: file
             })))
 
+    // ---- KRunner ---------------------------------------------------------
+
+    // Created on first use and kept, so the runner plugins load once.
+    Loader {
+        id: runner
+
+        active: false
+        source: Qt.resolvedUrl("launcher/Runner.qml")
+    }
+
+    readonly property var backend: runner.item
+    // org.kde.milou is missing or no longer loads here
+    readonly property bool backendFailed: runner.status === Loader.Error
+    readonly property bool searching: query.trim() !== ""
+    readonly property bool shellMode: query.trim().startsWith(">")
+    readonly property bool runnerMode: searching && !shellMode
+    // results for the typed query are still on their way
+    readonly property bool waiting: runnerMode && backend !== null && !backend.fresh
+    readonly property bool querying: runnerMode && backend !== null && (backend.querying || !backend.fresh)
+
+    Binding {
+        target: root.backend
+        property: "query"
+        value: root.runnerMode ? root.query : ""
+        when: root.backend !== null
+    }
+
+    Connections {
+        target: root.backend
+
+        function onQueryRequested(text) {
+            root.query = text;
+        }
+
+        // Enter was pressed before the results arrived: run the first one now
+        function onFreshChanged() {
+            if (!root.backend.fresh || !root.pendingRun)
+                return;
+            root.pendingRun = false;
+            if (root.open && root.results.length > 0)
+                root.activate(root.results[0], 0, -1);
+        }
+    }
+
+    // The application a result of KRunner's stands for, if it is one: such a
+    // result names what it runs ("exec:///usr/bin/dolphin"), not the desktop
+    // entry, so that is found by its name, and among several of one name by
+    // what it runs.
+    function entryOf(result) {
+        if (!result)
+            return null;
+        if (result.entry)
+            return result.entry;
+        if (result.kind !== "match" || !result.id.startsWith("exec://"))
+            return null;
+        const named = sorted.filter(entry => entry.name === result.title);
+        if (named.length < 2)
+            return named[0] ?? null;
+        const runs = result.id.slice(7);
+        return named.find(entry => entry.execString.replace(/\s*%[a-zA-Z]/g, "").trim() === runs) ?? named[0];
+    }
+
     // ---- results ---------------------------------------------------------
 
-    // What the panel lists for the current query. Each result has title,
-    // subtitle, icon, symbolic (recolour the icon) and what activating it does.
+    // What the panel lists for what is typed. Each result has key (its
+    // identity, to find it again in the next list), kind, title, subtitle,
+    // icon, symbolic (recolour the icon), category and actions (extra
+    // things it can do: text and icon each).
     readonly property var results: {
-        const text = query.trim();
-
-        if (text.startsWith(">")) {
-            const words = text.slice(1).toLowerCase().split(/\s+/).filter(word => word);
+        if (shellMode) {
+            const words = query.trim().slice(1).toLowerCase().split(/\s+/).filter(word => word);
             return actions.filter(action => words.every(word => action.title.toLowerCase().includes(word))).map(action => ({
+                        key: "action\n" + action.title,
                         kind: "action",
                         title: action.title,
                         subtitle: action.subtitle,
                         icon: action.icon,
                         symbolic: true,
+                        category: "Shell",
+                        actions: [],
                         action: action
                     }));
         }
-
-        const list = [];
-
-        const explicit = text.startsWith("=");
-        if (explicit || Calc.looksLikeMath(text)) {
-            const value = Calc.evaluate(explicit ? text.slice(1) : text);
-            if (value !== null) {
-                list.push({
-                    kind: "calc",
-                    title: Calc.format(value),
-                    subtitle: "Enter copies the result",
-                    icon: "accessories-calculator",
-                    symbolic: false,
-                    value: Calc.format(value)
-                });
-            } else if (explicit) {
-                list.push({
-                    kind: "none",
-                    title: text.length > 1 ? "Not a complete expression" : "Type an expression",
-                    subtitle: "For example 2 * (3 + 4), sqrt(2), 10 % 3",
-                    icon: "accessories-calculator",
-                    symbolic: false
-                });
-            }
-            if (explicit)
-                return list;
-        }
-
-        const now = Date.now();
-        const words = text.toLowerCase().split(/\s+/).filter(word => word);
-        const ranked = [];
-        for (const app of apps) {
-            const used = frecency(app.entry.id, now);
-            // without a query: most used first, then alphabetical
-            const score = words.length === 0 ? used : Search.score(app.fields, words);
-            if (words.length > 0 && score <= 0)
-                continue;
-            ranked.push({
-                app: app,
-                // a little help for apps in regular use, never enough to beat a clearly better match
-                score: words.length === 0 ? score : score + Math.min(12, used * 3)
-            });
-        }
-        ranked.sort((a, b) => b.score - a.score || a.app.fields.name.localeCompare(b.app.fields.name));
-
-        for (const item of ranked)
-            list.push(appResult(item.app.entry));
-        return list;
+        return backend?.matches ?? [];
     }
 
-    function activate(result) {
+    // Enter was pressed while results were still on their way
+    property bool pendingRun: false
+
+    onOpenChanged: pendingRun = false
+    onQueryChanged: pendingRun = false
+
+    // Enter or a click on `result`, row `index` of what is listed; `action`
+    // >= 0 picks one of its actions.
+    function submit(result, index, action) {
+        if (waiting) {
+            pendingRun = true;
+            return;
+        }
+        activate(result, index, action);
+    }
+
+    function activate(result, index, action) {
         if (!result)
             return;
         if (result.kind === "app") {
@@ -601,18 +619,29 @@ Singleton {
         } else if (result.kind === "session") {
             hide();
             SessionActions.runWithPrompt(result.session);
-        } else if (result.kind === "calc") {
-            // wl-copy rather than Quickshell.clipboardText: setting that did not reach the clipboard here
-            Quickshell.execDetached(["wl-copy", "--", result.value]);
-            hide();
         } else if (result.kind === "action") {
             LastWindow.expectWindow();
             hide();
             runAction(result.action);
+        } else if (result.kind === "match") {
+            // The calculator and the unit converter only copy their answer.
+            // They would do it through this process's clipboard; wl-copy is
+            // the way that is known to work from here
+            // (Quickshell.clipboardText did not reach the clipboard either).
+            // As in KRunner, the converter's action copies the unit too.
+            if (result.answer) {
+                const number = /^[-+\d.,'\s]*\d/.exec(result.title);
+                const bare = result.id === "unitconverter" && action < 0 && number;
+                Quickshell.execDetached(["wl-copy", "--", bare ? number[0].trim() : result.title]);
+                hide();
+            } else if (backend.run(index, result.id, action)) {
+                LastWindow.expectWindow();
+                hide();
+            }
         }
     }
 
-    // One of `actions`; also used by the command palette.
+    // one of `actions`
     function runAction(action) {
         if (action.reload)
             Quickshell.reload(false);
@@ -626,6 +655,8 @@ Singleton {
             Themes.setBackground(action.background);
         else if (action.browsers)
             Themes.setBrowsers(action.browsers);
+        else if (action.glass)
+            Themes.setGlass(action.glass === "on");
         else if (action.login)
             LoginScreen.check(true);
         else if (action.setup)

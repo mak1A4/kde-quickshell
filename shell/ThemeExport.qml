@@ -88,6 +88,92 @@ Singleton {
         return selection;
     }
 
+    // ---- the lock screen's clock -----------------------------------------
+
+    // The clock stands on the background, not on anything of the theme's, so
+    // the theme's text colour is right for it only by chance (dark figures on
+    // a dark picture with a light theme). What is under it is measured: the
+    // part of the picture the clock is on (a video's frame two seconds in),
+    // as 16 by 8 grey values, by ffmpeg. `file` says which background they
+    // are of.
+    property var under: ({
+            file: "",
+            cells: []
+        })
+
+    readonly property string background: Themes.background
+    onBackgroundChanged: measure.look()
+
+    Process {
+        id: measure
+
+        property string picture
+
+        function look() {
+            if (running)
+                return;
+            picture = root.background;
+            if (picture === "") {
+                root.under = {
+                    file: "",
+                    cells: []
+                };
+                return;
+            }
+            // the picture as the wallpaper crops it to the screen, then the
+            // middle half of its width from 24 % to 49 % of its height
+            command = ["sh", "-c", `case "$1" in *.mp4 | *.webm | *.mkv | *.mov | *.gif) seek="-ss 2" ;; esac
+ffmpeg -v error $seek -i "$1" -frames:v 1 -vf "scale=1600:900:force_original_aspect_ratio=increase,crop=1600:900,crop=800:225:400:216,scale=16:8:flags=area,format=gray" -f rawvideo - < /dev/null | od -An -v -tu1`, "sh", picture];
+            running = true;
+        }
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                root.under = {
+                    file: measure.picture,
+                    // grey values to how light they are to the eye, 0 to 1
+                    cells: text.trim().split(/\s+/).filter(value => value !== "").map(value => {
+                        const part = Number(value) / 255;
+                        return part <= 0.04045 ? part / 12.92 : Math.pow((part + 0.055) / 1.055, 2.4);
+                    })
+                };
+            }
+        }
+        // another background was chosen while this ran
+        onExited: {
+            if (picture !== root.background)
+                look();
+        }
+    }
+
+    // The clock's colour and its shadow's: the lightest or the darkest of the
+    // theme's tones (taken further, see below), whichever reads better on the worst tenth of what is
+    // under it, and a shadow of the other kind. With nothing measured (no
+    // background of the theme's: Plasma's own wallpaper) the light one,
+    // which a dark shadow carries on most pictures.
+    function clockFor(theme: var): var {
+        const tones = [theme.fg, theme.bg, theme.view].map(colour => String(Qt.color(colour)).slice(0, 7)).sort((a, b) => luminance(a) - luminance(b));
+        // A light theme's text is often a middle grey, and a dark theme's
+        // not white: taken further, in their own hue, until they are dark
+        // and light enough to stand on a picture.
+        let dark = tones[0], light = tones[2];
+        while (luminance(dark) > 0.04)
+            dark = scaled(dark, 0.9);
+        while (luminance(light) < 0.8)
+            light = between(light, "#ffffff", 0.1);
+        const cells = under.file === background ? under.cells : [];
+        const worst = tone => {
+            const own = luminance(tone);
+            const ratios = cells.map(cell => (Math.max(own, cell) + 0.05) / (Math.min(own, cell) + 0.05)).sort((a, b) => a - b);
+            return ratios[Math.floor(ratios.length / 10)];
+        };
+        const colour = cells.length > 0 && worst(dark) > worst(light) ? dark : light;
+        return {
+            colour: colour,
+            shadow: colour === dark ? "#99ffffff" : "#b3000000"
+        };
+    }
+
     function isDark(colour: string): bool {
         const [r, g, b] = channels(colour);
         return 0.299 * r + 0.587 * g + 0.114 * b < 128;
@@ -135,6 +221,9 @@ Singleton {
             values[name + "_rgb"] = channels(colour).join(",");
             values[name + "_strip"] = colour.slice(1);
         }
+        const clock = clockFor(theme);
+        values.clock = clock.colour;
+        values.clockShadow = clock.shadow;
         // the dark edge libadwaita draws where one surface lies on another
         values.shade = dark ? "rgba(0, 0, 0, 0.36)" : "rgba(0, 0, 0, 0.12)";
         // for the browsers' policy: the colour of the frame, or none

@@ -5,7 +5,7 @@ The keys enter through the kernel (uinput) like a real keyboard's, so they take
 the whole path: KWin, global shortcuts, keyboard focus, the layer surface. They
 go to whatever has the focus, exactly as if typed. Before sending Enter, make
 sure the shell has it: type a letter and read it back with
-`qs ipc call palette query`.
+`qs ipc call launcher query`.
 
     tools/keys.py ctrl+space            a chord
     tools/keys.py down down enter       keys in sequence

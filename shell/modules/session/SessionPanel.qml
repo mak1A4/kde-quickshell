@@ -57,7 +57,7 @@ Item {
                 color: armed ? Theme.error : (mouse.containsMouse ? Theme.surfaceHover : Theme.none)
 
                 Behavior on color {
-                    ColorAnim {}
+                    HoverAnim {}
                 }
 
                 RowLayout {

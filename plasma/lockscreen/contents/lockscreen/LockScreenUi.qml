@@ -256,10 +256,12 @@ Item {
         y: Math.round(parent.height * 0.36 - height / 2)
         spacing: 0
         layer.enabled: true
-        // on any wallpaper: a soft shadow under the figures
+        // The shell says which colour reads on its background, and gives a
+        // shadow of the other kind (a Look.qml from before it did has
+        // neither). A soft shadow under the figures, for the rest.
         layer.effect: MultiEffect {
             shadowEnabled: true
-            shadowColor: Qt.rgba(0, 0, 0, 0.7)
+            shadowColor: ui.look.clockShadow ?? Qt.rgba(0, 0, 0, 0.7)
             shadowVerticalOffset: 2
             blurMax: 36
             shadowBlur: 0.8
@@ -267,7 +269,7 @@ Item {
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            color: ui.look.fg
+            color: ui.look.clock ?? ui.look.fg
             font.pixelSize: Math.round(ui.height * 0.16)
             font.weight: Font.Bold
             font.letterSpacing: -2
@@ -276,7 +278,7 @@ Item {
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            color: ui.look.fg
+            color: ui.look.clock ?? ui.look.fg
             font.pixelSize: Math.max(16, Math.round(ui.height * 0.03))
             font.weight: Font.DemiBold
             text: ui.now.toLocaleDateString(Qt.locale(), Locale.LongFormat)

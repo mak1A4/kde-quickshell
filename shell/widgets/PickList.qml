@@ -16,6 +16,16 @@ import qs
 // steps, which reads as continuous motion instead of hops. Under the pointer
 // the highlight moves much faster (`Theme.followDuration`): the pointer is
 // already on the row, and a highlight still on its way there reads as lag.
+// (Not moving at all for the pointer, there at once on each row, was tried
+// for a quarter of an hour: it "still doesn't feel right".)
+//
+// The pointer has the selection only while it is on the list. When it leaves,
+// the selection is back on the row the keys had chosen (`keyed`). Left on the
+// row the pointer was last on, it marked a row for no reason anyone could see.
+//
+// With `lazy` set, no row is marked until the pointer or the keys choose one
+// (`marked`): the first arrow key then shows the first row, and a pointer
+// that leaves a list the keys have not been in leaves no row marked.
 ListView {
     id: root
 
@@ -38,6 +48,20 @@ ListView {
     property bool pointing: false
     // set to move the highlight without animation
     property bool jump: false
+    // the row the keys have chosen, where the selection is while the pointer
+    // is not on the list
+    property int keyed: 0
+    // no row is marked before the keys or the pointer choose one
+    property bool lazy: false
+    // the keys have chosen a row (without `lazy`: the first counts as chosen)
+    property bool keysOn: !lazy
+    // there is a chosen row: the highlight shows, and Enter is for it
+    readonly property bool marked: pointing || keysOn
+
+    // the pointer has left, and the selection has gone back to `keyed`, or
+    // to none
+    // (not "left": that is an item's left edge)
+    signal pointerLeft
 
     property real highlightY: currentIndex * rowHeight
 
@@ -77,9 +101,29 @@ ListView {
         }
         scroll.stop();
         following = true;
-        pointing = false;
         keyedAt = pointerAt;
+        // nothing chosen yet: the first key shows where the keys are, the
+        // first row, and does not move from it
+        if (!marked) {
+            keysOn = true;
+            jump = true;
+            currentIndex = 0;
+            jump = false;
+            keyed = 0;
+            return;
+        }
+        pointing = false;
+        keysOn = true;
         currentIndex = Math.max(0, Math.min(count - 1, currentIndex + by));
+        keyed = currentIndex;
+    }
+
+    // This row, as if the keys had chosen it: it stays when the pointer leaves.
+    function choose(index: int): void {
+        pointing = false;
+        keysOn = true;
+        currentIndex = index;
+        keyed = index;
     }
 
     // Where the pointer was last seen, in window coordinates (x < 0: not yet).
@@ -112,8 +156,15 @@ ListView {
         }
         repeating = false;
         following = false;
+        // no row was marked: the highlight appears on this one, it does not
+        // come over from where it last was
+        const fresh = !marked;
+        if (fresh)
+            jump = true;
         pointing = true;
         currentIndex = index;
+        if (fresh)
+            jump = false;
     }
 
     // back to the first row, at the top, without gliding there
@@ -121,6 +172,9 @@ ListView {
         scroll.stop();
         jump = true;
         currentIndex = 0;
+        keyed = 0;
+        keysOn = !lazy;
+        pointing = false;
         contentY = 0;
         jump = false;
     }
@@ -171,7 +225,8 @@ ListView {
 
         target: root
         property: "contentY"
-        duration: Theme.followDuration * 2
+        // (not tied to the highlight's speed under the pointer, which was halved since)
+        duration: 140
         easing.type: Easing.OutCubic
     }
 
@@ -186,6 +241,24 @@ ListView {
     WheelHandler {
         // the list's own flicking is not wanted: see above
         onWheel: event => root.wheel(event)
+    }
+
+    // The pointer leaves the list: the selection it had goes back, without
+    // scrolling. Asked of the list as a whole, not of the rows: a row
+    // reports the pointer gone and back while it is still on it (seen at the
+    // line between two rows), and a moment without any row under the
+    // pointer was taken for its leaving.
+    HoverHandler {
+        onHoveredChanged: {
+            if (hovered || !root.pointing)
+                return;
+            root.repeating = false;
+            root.following = false;
+            root.pointing = false;
+            if (root.keysOn)
+                root.currentIndex = Math.max(0, Math.min(root.count - 1, root.keyed));
+            root.pointerLeft();
+        }
     }
 
     height: Math.min(count, maxRows) * rowHeight
@@ -206,6 +279,13 @@ ListView {
         height: root.rowHeight
         radius: 12
         color: Theme.surface
-        visible: root.currentItem !== null && root.highlighted
+        opacity: root.currentItem !== null && root.highlighted && root.marked ? 1 : 0
+        visible: opacity > 0
+
+        Behavior on opacity {
+            NumberAnimation {
+                duration: 60
+            }
+        }
     }
 }

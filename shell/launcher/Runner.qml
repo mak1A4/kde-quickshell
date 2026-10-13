@@ -3,7 +3,7 @@ import org.kde.milou as Milou
 
 // KRunner's search, without KRunner's window: the result model Plasma's own
 // KRunner uses (from Milou), which runs the runner plugins enabled in System
-// Settings > Search > KRunner inside this process. Loaded by the CommandPalette
+// Settings > Search > KRunner inside this process. Loaded by the Launcher
 // singleton through a Loader, because the import is optional.
 //
 // `matches` is the model's content as plain objects, in the model's order
@@ -51,7 +51,7 @@ Item {
     }
 
     // Runs a match, or one of its actions (`action` >= 0). True if that did
-    // something and the palette can close.
+    // something and the launcher can close.
     function run(row, id, action) {
         const at = locate(row, id);
         if (at < 0)

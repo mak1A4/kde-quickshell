@@ -28,6 +28,8 @@ import Qt.labs.folderlistmodel
 // The choice, of the theme and of each theme's background, is in
 // ~/.config/kde-quickshell/theme.json, made among the ">" actions
 // ("Theme: ...", "Background: ...") or with `qs ipc call theme set <name>`.
+// With it, whether the frame is glass and how transparent (`glass`,
+// `transparency`), which the settings window writes there too.
 // The chosen theme's file is watched: saving it recolours the shell.
 Singleton {
     id: root
@@ -46,6 +48,12 @@ Singleton {
     // shell keeps out, for "Use Qt" in the browser's own settings, which
     // takes KDE's colours.
     property string browsers: "policy"
+    // Whether the frame and its panels are glass: half transparent, with
+    // what is behind them blurred (Theme.frameOpacity). Not: solid.
+    property bool glass: true
+    // How transparent the glass is: how much of what is behind it shows,
+    // from a tenth to nine tenths.
+    property real transparency: 0.5
 
     // every theme there is, by file name without the ending
     readonly property list<string> names: {
@@ -104,8 +112,24 @@ Singleton {
         choice.setText(JSON.stringify({
             theme: chosen,
             backgrounds: picked,
-            browsers: browsers
+            browsers: browsers,
+            glass: glass,
+            transparency: transparency
         }, null, 2) + "\n");
+    }
+
+    function clearness(value: var): real {
+        return typeof value === "number" && isFinite(value) ? Math.round(Math.max(0.1, Math.min(0.9, value)) * 100) / 100 : 0.5;
+    }
+
+    function setTransparency(value: real): void {
+        transparency = clearness(value);
+        save();
+    }
+
+    function setGlass(on: bool): void {
+        glass = on;
+        save();
     }
 
     function setBrowsers(how: string): bool {
@@ -159,6 +183,8 @@ Singleton {
         if (JSON.stringify(files) !== JSON.stringify(picked))
             picked = files;
         browsers = stored?.browsers === "system" ? "system" : "policy";
+        glass = stored?.glass !== false;
+        transparency = clearness(stored?.transparency);
     }
 
     function read() {
@@ -227,8 +253,11 @@ Singleton {
     // something in it changes. Until the list is that of the chosen theme,
     // nothing is known about its backgrounds and nothing is shown.
     function list() {
-        if (lister.running)
+        if (lister.running) {
+            relist = true;
             return;
+        }
+        relist = false;
         lister.theme = chosen;
         // not `backgroundDir`: at a change of theme that may still be the
         // directory of the theme before
@@ -237,6 +266,9 @@ Singleton {
     }
 
     onChosenChanged: list()
+
+    // something changed in the directory while it was being listed
+    property bool relist: false
 
     Process {
         id: lister
@@ -251,9 +283,9 @@ Singleton {
                 };
             }
         }
-        // the theme was changed while this ran
+        // the theme was changed while this ran, or its files were
         onExited: {
-            if (theme !== root.chosen)
+            if (theme !== root.chosen || root.relist)
                 root.list();
         }
     }
@@ -410,6 +442,28 @@ Singleton {
 
         function setBackground(file: string): string {
             return root.setBackground(file) ? file : `"${root.chosen}" has no background "${file}". It has: ${root.backgrounds.join(", ")}`;
+        }
+
+        // "on" or "off": see `glass`
+        function glass(): string {
+            return root.glass ? "on" : "off";
+        }
+
+        function setGlass(how: string): string {
+            if (how !== "on" && how !== "off")
+                return "on or off";
+            root.setGlass(how === "on");
+            return how;
+        }
+
+        // in percent, 10 to 90: see `transparency`
+        function transparency(): string {
+            return String(Math.round(root.transparency * 100));
+        }
+
+        function setTransparency(percent: int): string {
+            root.setTransparency(percent / 100);
+            return transparency();
         }
     }
 }

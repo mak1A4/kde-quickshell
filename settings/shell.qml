@@ -22,6 +22,10 @@ ShellRoot {
         id: barItems
     }
 
+    Appearance {
+        id: appearance
+    }
+
     FloatingWindow {
         title: "Quickshell Settings"
         implicitWidth: 720
@@ -86,6 +90,59 @@ ShellRoot {
                             conflictMessage.foreign = kdeShortcuts.conflictForeign;
                         }
                         conflictMessage.visible = conflict !== null;
+                    }
+                }
+            }
+
+            Kirigami.FormLayout {
+                Layout.fillWidth: true
+                twinFormLayouts: [shortcutForm]
+
+                Kirigami.Separator {
+                    Kirigami.FormData.isSection: true
+                    Kirigami.FormData.label: "Appearance"
+                }
+
+                QQC2.CheckBox {
+                    id: glassBox
+
+                    Kirigami.FormData.label: "Frame and panels:"
+                    text: "Transparent, with what is behind them blurred"
+                    onToggled: appearance.setGlass(checked)
+
+                    // not a binding on `checked`, which a click would end:
+                    // the box also follows a change made in the shell
+                    Binding {
+                        target: glassBox
+                        property: "checked"
+                        value: appearance.glass
+                    }
+                }
+
+                RowLayout {
+                    Kirigami.FormData.label: "Transparency:"
+                    enabled: appearance.glass
+                    spacing: Kirigami.Units.smallSpacing
+
+                    // the shell follows while it is dragged
+                    QQC2.Slider {
+                        id: transparencySlider
+
+                        Layout.preferredWidth: Kirigami.Units.gridUnit * 12
+                        from: 0.1
+                        to: 0.9
+                        stepSize: 0.05
+                        onMoved: appearance.setTransparency(value)
+
+                        Binding {
+                            target: transparencySlider
+                            property: "value"
+                            value: appearance.transparency
+                        }
+                    }
+
+                    QQC2.Label {
+                        text: Math.round(transparencySlider.value * 100) + " %"
                     }
                 }
             }

@@ -9,8 +9,14 @@
 const modifiers = [["Meta", 0x10000000], ["Ctrl", 0x04000000], ["Alt", 0x08000000], ["Shift", 0x02000000], ["Num", 0x20000000]];
 const modifierMask = 0x3e000000;
 
-// Qt's names for the keys that are not a single character
+// Qt's names for the keys that are not a single character. The first four
+// are a modifier pressed and let go on its own, which KDE takes as a shortcut
+// too ("Meta" is the key for Plasma's launcher).
 const named = {
+    "Shift": 0x01000020,
+    "Control": 0x01000021,
+    "Meta": 0x01000022,
+    "Alt": 0x01000023,
     "Space": 0x20,
     "Esc": 0x01000000,
     "Tab": 0x01000001,
