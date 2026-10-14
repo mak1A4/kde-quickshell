@@ -15,6 +15,10 @@ Item {
 
     // the screen this dock is on, to tell whether the launcher is meant for it
     required property var screen
+    // How much of the bottom border, from the screen's left edge, does not
+    // bring the dock up: the notification light is in that corner
+    // (Frame.qml), and the pointer on it is not asking for the dock.
+    property real cornerRoom: 0
 
     property bool shown: false
     // an icon of this dock is being dragged, or its menu is open (Pins)
@@ -124,11 +128,12 @@ Item {
         onTriggered: root.shown = false
     }
 
-    // the bottom border strip; always part of the frame's input region
+    // The bottom border strip; always part of the frame's input region. Not
+    // its left end where that is another's (`cornerRoom`).
     Item {
-        x: Theme.frameBorder
+        x: Math.max(Theme.frameBorder, root.cornerRoom)
         y: root.edgeY
-        width: root.width - Theme.frameBorder - Theme.barWidth
+        width: root.width - x - Theme.barWidth
         height: Theme.frameBorder
 
         HoverHandler {

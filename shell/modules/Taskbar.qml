@@ -32,6 +32,13 @@ import qs.widgets
 // An icon can be dragged along the row to another place. While it is
 // dragged the others only make room; the order is changed once, when it is
 // let go.
+//
+// An application has one icon, however many windows it has (the task
+// list's grouping, as a tree: a row per application, its windows below it).
+// With more than one there is a dot under the icon for each (up to four).
+// A click brings up the one that was in front last, and the next one while
+// one of them is active; the menu lists them to pick one, and closing
+// closes them all.
 RowLayout {
     id: root
 
@@ -76,7 +83,9 @@ RowLayout {
     TaskManager.TasksModel {
         id: tasks
 
-        groupMode: TaskManager.TasksModel.GroupDisabled
+        // one row per application, its windows as the row's children
+        groupMode: TaskManager.TasksModel.GroupApplications
+        groupInline: false
         // the order of the icons is made further down
         sortMode: TaskManager.TasksModel.SortDisabled
         launcherList: Pins.pinned
@@ -122,8 +131,8 @@ RowLayout {
     property bool arranging: false
 
     // Puts the icons in the order of Pins.order. An application not in it
-    // yet goes to the end, of the row and of the order. Several windows of
-    // one application stay together, in the order they have.
+    // yet goes to the end, of the row and of the order. Rows of one key
+    // (a window that is not grouped) stay together, in the order they have.
     function arrange() {
         if (arranging)
             return;
@@ -245,9 +254,68 @@ RowLayout {
             }
             property real shownAside: aside
 
+            // the application's windows here: several for a group, else this one
+            readonly property bool group: model.IsGroupParent ?? false
+            readonly property int windows: group ? model.ChildCount : launcher ? 0 : 1
+
+            // A group's windows, in the task list's order, with what a click
+            // and the menu need to know of each.
+            function members() {
+                const list = [];
+                for (let child = 0; child < model.ChildCount; child++) {
+                    const at = tasks.makeModelIndex(index, child);
+                    const last = Number(tasks.data(at, TaskManager.AbstractTasksModel.LastActivated));
+                    list.push({
+                        at: at,
+                        title: String(tasks.data(at, Qt.DisplayRole) ?? ""),
+                        active: tasks.data(at, TaskManager.AbstractTasksModel.IsActive) === true,
+                        minimized: tasks.data(at, TaskManager.AbstractTasksModel.IsMinimized) === true,
+                        last: isNaN(last) ? -1 : last
+                    });
+                }
+                return list;
+            }
+
+            // A left click on a group: the next window while one of them is
+            // active, otherwise the one that was active last.
+            function activateGroup() {
+                const list = members();
+                if (list.length === 0)
+                    return;
+                const active = list.findIndex(member => member.active);
+                let chosen = 0;
+                if (active >= 0)
+                    chosen = (active + 1) % list.length;
+                else
+                    list.forEach((member, at) => {
+                        if (member.last > list[chosen].last)
+                            chosen = at;
+                    });
+                tasks.requestActivate(list[chosen].at);
+            }
+
+            // A group's windows each, from the last: the group's own row is
+            // its first window, and closing it first would move the others.
+            function closeAll() {
+                const list = members();
+                for (let at = list.length - 1; at >= 0; at--)
+                    tasks.requestClose(list[at].at);
+            }
+
             function openMenu() {
                 const row = tasks.makeModelIndex(index);
                 const actions = [];
+                // a group's windows first, to pick one; long titles shortened
+                if (group)
+                    for (const member of members()) {
+                        const at = member.at;
+                        const title = member.title.length > 48 ? member.title.slice(0, 47) + "…" : member.title;
+                        actions.push({
+                            text: title || "Window",
+                            icon: member.minimized ? "window-minimize-symbolic" : "window-symbolic",
+                            run: () => tasks.requestActivate(at)
+                        });
+                    }
                 if (String(address) !== "") {
                     const address = task.address;
                     actions.push(pinned ? {
@@ -267,7 +335,11 @@ RowLayout {
                             icon: "window-new-symbolic",
                             run: () => tasks.requestNewInstance(row)
                         });
-                    actions.push({
+                    actions.push(group ? {
+                        text: "Close All " + windows + " Windows",
+                        icon: "window-close-symbolic",
+                        run: () => task.closeAll()
+                    } : {
                         text: "Close",
                         icon: "window-close-symbolic",
                         run: () => tasks.requestClose(row)
@@ -322,6 +394,28 @@ RowLayout {
                 colorize: false
             }
 
+            // one dot per window, for an application with several
+            Row {
+                anchors {
+                    horizontalCenter: parent.horizontalCenter
+                    bottom: parent.bottom
+                    bottomMargin: 3
+                }
+                spacing: 3
+                visible: task.windows > 1
+
+                Repeater {
+                    model: Math.min(task.windows, 4)
+
+                    Rectangle {
+                        implicitWidth: 3
+                        implicitHeight: 3
+                        radius: 1.5
+                        color: Theme.fg
+                    }
+                }
+            }
+
             MouseArea {
                 id: mouse
 
@@ -334,9 +428,13 @@ RowLayout {
                     if (event.button === Qt.RightButton)
                         task.openMenu();
                     else if (event.button === Qt.MiddleButton) {
-                        if (!task.launcher)
+                        if (task.group)
+                            task.closeAll();
+                        else if (!task.launcher)
                             tasks.requestClose(modelIndex);
-                    } else if (task.model.IsActive)
+                    } else if (task.group)
+                        task.activateGroup();
+                    else if (task.model.IsActive)
                         tasks.requestToggleMinimized(modelIndex);
                     else
                         // a pinned application without a window is started

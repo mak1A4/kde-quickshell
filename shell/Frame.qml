@@ -2,7 +2,6 @@ import Quickshell
 import Quickshell.Wayland
 import QtQuick
 import QtQuick.Effects
-import qs.ai
 import qs.notifications
 import qs.palette
 import qs.picker
@@ -15,11 +14,9 @@ PanelWindow {
     id: root
 
     readonly property real innerRight: width - Theme.barWidth
-    // the AI panel's content, once loaded, is kept for the shell's life
-    property bool aiEverOpened: false
     readonly property bool popoutOpen: Popouts.current !== "" && within(Popouts.anchorItem, bar)
     // a popout, the launcher or the palette: something that a click elsewhere dismisses
-    readonly property bool modal: popoutOpen || dock.launcherOpen || commandPalette.showing || aiPanel.showing || notificationCorner.listOpen
+    readonly property bool modal: popoutOpen || dock.launcherOpen || commandPalette.showing || notificationCorner.listOpen
 
     // Hovered item with a hint. A hint waits Theme.hintDelay before it first
     // appears; once one is showing, moving to another item switches at once.
@@ -102,7 +99,7 @@ PanelWindow {
     // stayed the active window after the list had closed, and the window
     // being worked in had to be clicked to type again. KWin gives the
     // keyboard back when an exclusive surface lets go.
-    WlrLayershell.keyboardFocus: dock.launcherOpen || commandPalette.showing || aiPanel.showing || notificationCorner.listOpen ? WlrKeyboardFocus.Exclusive : (popoutOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
+    WlrLayershell.keyboardFocus: dock.launcherOpen || commandPalette.showing || notificationCorner.listOpen ? WlrKeyboardFocus.Exclusive : (popoutOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
 
     // KWin leaves this surface the active window when it stops asking for the
     // keyboard, so the window that had it before is activated again
@@ -172,21 +169,13 @@ PanelWindow {
             intersection: Intersection.Subtract
         }
 
-        // the notch with the number of threads at work is clicked on
+        // notification popups take the pointer too (the open list has
+        // all of it anyway)
         Region {
-            x: aiPanel.area.x
-            y: aiPanel.area.y
-            width: aiPanel.area.width
-            height: aiPanel.area.height
-            intersection: Intersection.Subtract
-        }
-
-        // notification popups take the pointer too
-        Region {
-            x: notificationPanel.area.x
-            y: notificationPanel.area.y
-            width: notificationPanel.area.width
-            height: notificationPanel.area.height
+            x: notificationCorner.area.x
+            y: notificationCorner.area.y
+            width: notificationCorner.area.width
+            height: notificationCorner.area.height
             intersection: Intersection.Subtract
         }
     }
@@ -199,7 +188,6 @@ PanelWindow {
             Popouts.close();
             Launcher.hide();
             CommandPalette.hide();
-            Ai.hide();
             Notifications.listOpen = false;
         }
     }
@@ -227,9 +215,11 @@ PanelWindow {
             readonly property vector4d panel0: dock.blob
             readonly property vector4d panel1: sidePanel.blob
             readonly property vector4d panel2: commandPalette.blob
-            readonly property vector4d panel3: notificationPanel.blob
+            // free since the notification popups moved into the corner (panel4)
+            readonly property vector4d panel3: Qt.vector4d(0, 0, 0, 0)
             readonly property vector4d panel4: notificationCorner.blob
-            readonly property vector4d panel5: aiPanel.blob
+            // free since the AI panel was removed
+            readonly property vector4d panel5: Qt.vector4d(0, 0, 0, 0)
             readonly property vector4d bubble: dockHint.blob
             readonly property real bubbleRadius: 12
             readonly property color bubbleColor: Theme.tooltipBg
@@ -374,17 +364,7 @@ PanelWindow {
         }
 
         BlurBlob {
-            blob: notificationPanel.blob
-            hole: root.hole
-        }
-
-        BlurBlob {
             blob: notificationCorner.blob
-            hole: root.hole
-        }
-
-        BlurBlob {
-            blob: aiPanel.blob
             hole: root.hole
         }
     }
@@ -394,6 +374,7 @@ PanelWindow {
 
         anchors.fill: parent
         screen: root.screen
+        cornerRoom: notificationCorner.here ? notificationCorner.reach : 0
     }
 
     // The panel hanging from the top edge: the clipboard history or the
@@ -446,98 +427,14 @@ PanelWindow {
         }
     }
 
-    // The AI panel (T3 Code, natively; see Ai.qml), also hanging from the top
-    // edge but wider, and of two sizes: its two pages take turns. Its
-    // content stays loaded once first shown, so what is written in the
-    // composer and where a thread was scrolled to survive closing.
-    //
-    // Closed, it is still out a little while threads are at work or it is
-    // the user's turn in one: a notch in the top edge's middle with the two
-    // numbers in it (ai/Notch.qml), which the panel grows out of when it
-    // opens. The notch steps aside for the palette, which hangs in the same
-    // place.
-    TopPanel {
-        id: aiPanel
-
-        readonly property bool showing: Ai.open && (Ai.screen === null || Ai.screen === root.screen)
-        readonly property bool notch: !showing && aiNotch.telling && !commandPalette.showing
-
-        anchors.fill: parent
-        edgeY: Theme.frameBorder
-        centreX: (Theme.frameBorder + root.innerRight) / 2
-        open: showing || notch
-        contentWidth: showing ? (aiLoader.item?.implicitWidth ?? 720) : aiNotch.implicitWidth
-        contentHeight: showing ? (aiLoader.item?.implicitHeight ?? 300) + aiLoader.y : aiNotch.implicitHeight
-        focus: showing
-        Keys.onEscapePressed: Ai.hide()
-
-        // clicks on the panel must not reach the dismiss area underneath
-        MouseArea {
-            anchors.fill: parent
-            enabled: aiPanel.showing
-            acceptedButtons: Qt.AllButtons
-        }
-
-        Loader {
-            id: aiLoader
-
-            // Made when first shown, and already while the notch is out: the
-            // panel grows out of the notch to the content's size, and a
-            // content that is only then being made has none yet. It grew
-            // towards a guess and turned round.
-            active: aiPanel.showing || root.aiEverOpened || aiNotch.telling
-            // Under the notch's dots, which stay where they are when the
-            // panel opens: its content begins a little below where the
-            // notch ends, which is close under its dots.
-            y: Theme.notchHeight + 3 - (item?.margin ?? 12)
-            enabled: aiPanel.showing
-            opacity: aiPanel.showing ? 1 : 0
-            visible: opacity > 0
-            sourceComponent: AiPanel {}
-
-            // not in the same breath: `active` is still being worked out
-            onLoaded: Qt.callLater(() => root.aiEverOpened = true)
-
-            Behavior on opacity {
-                SwapFade {
-                    incoming: aiPanel.showing
-                }
-            }
-        }
-    }
-
-    // The notch's dots. Not in the panel, which keeps what is in it off the
-    // border: the dots reach up into the border (ai/Notch.qml), so that the
-    // notch need not be as deep as they are high. In the panel's middle, and
-    // moving with it as it comes out and goes back.
-    Notch {
-        id: aiNotch
-
-        x: aiPanel.leftX + (aiPanel.w - width) / 2
-        y: aiPanel.edgeY + aiPanel.slide
-        opacity: aiPanel.notch || aiPanel.showing ? 1 : 0
-        visible: opacity > 0
-        // on the thread that waits, if it is the only one that does
-        onClicked: {
-            const waiting = Ai.allThreads.filter(thread => Ai.kindOf(thread) === "waiting");
-            if (waiting.length === 1)
-                Ai.openThread(waiting[0].id);
-            Ai.show(root.screen);
-        }
-
-        Behavior on opacity {
-            SwapFade {
-                incoming: aiPanel.notch || aiPanel.showing
-            }
-        }
-    }
-
     // Notifications, quietly: the frame's bottom left corner. While there are
-    // some, the corner is rounded much further than the others, one even
-    // curve from the left border to the bottom one, and in the space that
-    // fills there is a light. It ripples for as long as some notifications
+    // some, there is a light in it, as far into the corner as it goes, and
+    // the corner is rounded a little further than the others, as much as
+    // gives the light room. It ripples for as long as some notifications
     // have not been looked at. A click there (or on the corner of the border,
-    // when there are none) and the list grows out of the corner. Middle click
+    // when there are none) and the list grows out of the corner; so do, by
+    // themselves, the notifications that are to be seen at once (they hung
+    // from the top edge against the bar first). Middle click
     // switches do not disturb. First screen only.
     CornerPanel {
         id: notificationCorner
@@ -546,14 +443,31 @@ PanelWindow {
         readonly property bool listOpen: here && Notifications.listOpen
         readonly property bool calling: Notifications.unread > 0 && !Notifications.doNotDisturb
         readonly property bool lit: here && Notifications.count > 0 && !listOpen
-        // The corner's radius: the frame's own without notifications, larger
-        // with some, larger still while the light is calling.
-        property real corner: !lit ? Theme.frameRounding : (Notifications.unread > 0 ? 72 : 54)
+        // Notifications that are to be seen at once come out of the same
+        // corner, as cards, for as long as KDE's model keeps them up; not
+        // while the list is open, which has them too.
+        readonly property bool popping: (popups.item?.count ?? 0) > 0 && !listOpen
+        // The corner's radius: the frame's own without notifications, and
+        // with some just enough for the light. The light's middle is 7.5 px
+        // from the screen's two edges, in the corner of the border itself,
+        // and it is 5.7 px at its widest (the dot on the in-breath, and its
+        // soft edge): out to the left and down it has 1.8 px, and at this
+        // radius 3.9 px to the curve. At the frame's own 7.5 it would reach
+        // over the curve. (The corner was 54, and 72 while the light was
+        // calling, the light halfway into what that filled; it lay over the
+        // corners of the windows once those came closer to the frame.)
+        property real corner: lit ? 18 : Theme.frameRounding
+        // where the light is from the hole's corner: less than nothing, it
+        // is in the border
+        readonly property real lightAt: -1.5
         // The filled corner is as deep, along its diagonal, as 0.414 of the
-        // radius. The light sits halfway; a square this size at the corner
-        // lies within the fill and is the button.
-        readonly property real lightAt: corner * 0.146
+        // radius; a square this size at the hole's corner lies within the
+        // fill and is the button, with the border's corner beside it.
         readonly property real button: lit ? corner * 0.29 : 0
+        // how far along the two borders the corner is the notifications':
+        // a click there opens the list, and the pointer there does not
+        // bring the dock up
+        readonly property real reach: 45
 
         function clicked(button) {
             if (button === Qt.MiddleButton)
@@ -569,15 +483,38 @@ PanelWindow {
         anchors.fill: parent
         edgeX: Theme.frameBorder
         edgeY: root.height - Theme.frameBorder
-        contentWidth: listOpen ? (notificationList.item?.implicitWidth ?? 363) : 0
-        contentHeight: listOpen ? (notificationList.item?.implicitHeight ?? 120) : 0
+        contentWidth: listOpen ? (notificationList.item?.implicitWidth ?? 363) : (popping ? popups.item.implicitWidth : 0)
+        contentHeight: listOpen ? (notificationList.item?.implicitHeight ?? 120) : (popping ? popups.item.implicitHeight : 0)
         focus: listOpen
         Keys.onEscapePressed: Notifications.listOpen = false
 
-        // clicks on the open list stop here
+        // clicks on the open list, or between the popups' cards, stop here
         MouseArea {
             anchors.fill: parent
             acceptedButtons: Qt.AllButtons
+        }
+
+        Loader {
+            id: popups
+
+            anchors {
+                left: parent.left
+                bottom: parent.bottom
+            }
+            active: notificationCorner.here && Notifications.popups !== null
+            opacity: notificationCorner.popping ? 1 : 0
+            visible: opacity > 0
+            sourceComponent: Popups {
+                notifications: Notifications.popups
+                timeout: Notifications.backend.popupTimeout
+                paused: !notificationCorner.popping
+            }
+
+            Behavior on opacity {
+                SwapFade {
+                    incoming: notificationCorner.popping
+                }
+            }
         }
 
         Loader {
@@ -617,9 +554,9 @@ PanelWindow {
     MouseArea {
         cursorShape: Qt.PointingHandCursor
         x: 0
-        y: root.height - 45
+        y: root.height - notificationCorner.reach
         width: Theme.frameBorder
-        height: 45
+        height: notificationCorner.reach
         enabled: notificationCorner.here && !root.modal
         acceptedButtons: Qt.LeftButton | Qt.MiddleButton
         onClicked: mouse => notificationCorner.clicked(mouse.button)
@@ -629,7 +566,7 @@ PanelWindow {
         cursorShape: Qt.PointingHandCursor
         x: 0
         y: root.height - Theme.frameBorder
-        width: 45
+        width: notificationCorner.reach
         height: Theme.frameBorder
         enabled: notificationCorner.here && !root.modal
         acceptedButtons: Qt.LeftButton | Qt.MiddleButton
@@ -668,42 +605,6 @@ PanelWindow {
             to: 3600
             duration: 3600000
             loops: Animation.Infinite
-        }
-    }
-
-    // Notification popups, hanging from the top edge against the bar, on the
-    // first screen. They step aside while the palette is open: the two would
-    // touch, and what is being typed comes first.
-    TopPanel {
-        id: notificationPanel
-
-        readonly property bool here: root.screen === Quickshell.screens[0]
-        readonly property bool showing: (popups.item?.count ?? 0) > 0 && !commandPalette.showing
-
-        anchors.fill: parent
-        edgeY: Theme.frameBorder
-        // its background runs on under the bar, so the two join
-        centreX: root.innerRight + Theme.panelRounding - contentWidth / 2
-        open: showing
-        contentWidth: (popups.item?.implicitWidth ?? 0) + Theme.panelRounding
-        contentHeight: popups.item?.implicitHeight ?? 0
-
-        // clicks between the cards go nowhere
-        MouseArea {
-            anchors.fill: parent
-            enabled: notificationPanel.showing
-            acceptedButtons: Qt.AllButtons
-        }
-
-        Loader {
-            id: popups
-
-            active: notificationPanel.here && Notifications.popups !== null
-            sourceComponent: Popups {
-                notifications: Notifications.popups
-                timeout: Notifications.backend.popupTimeout
-                paused: !notificationPanel.showing
-            }
         }
     }
 

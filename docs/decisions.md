@@ -16,18 +16,13 @@ windows could not blend into the border.
 - **Reserved space:** a layer surface reserves on one edge only, and this one touches all
   four, so `Exclusions.qml` adds four invisible, input-less 1 px surfaces with the
   exclusive zones. Maximized windows ended up exactly inside the border; since
-  2026-10-13 they keep `Theme.windowGap`, 27 px, from it on every side and from the
-  bar, and the desktop shows between: the height of the notch that comes out of the
-  top edge (see "AI chat") and 9 px more. First the top alone kept the notch's height,
-  and only while the notch was out, which moved every maximized window when a thread
-  started or ended; then 9 px were added on all sides ("a little padding against the
-  notch and in general accross the shell … something like 8px"; 9 is the nearest whole
-  device pixels); then the user: "make it more uniform the same distance as on the top
-  including the notch all around". Seen: KWin's area for maximized windows at 36, 36,
-  1809 × 1008 on the 1920 × 1080 screen. The same day the gap went from 27 px to 18
-  with the notch, which now is 9 px deep and not 18 ("reduce the height the notch needs
-  and with that reduce the padding in general"; see "AI chat"): the area at 27, 27,
-  1827 × 1026.
+  2026-10-13 they keep `Theme.windowGap` from it on every side and from the bar, and
+  the desktop shows between. It began as room for the AI panel's notch in the top
+  edge, then went on every side alike (the user: "a little padding against the notch
+  and in general accross the shell", "make it more uniform ... all around"): 27 px,
+  then 18 the same day, KWin's area for maximized windows at 27, 27, 1827 × 1026 on
+  the 1920 × 1080 screen. The notch went with the AI panel on 2026-10-14; the gap
+  stays at 18 px, now a value of its own.
 - **True fullscreen** windows cover the frame (KWin stacks them above the top layer).
   Accepted: the stated use is maximized windows.
 - **Popouts** (audio, power) are opened by a bar button via the `Popouts` singleton,
@@ -801,6 +796,29 @@ again, as if nothing had been installed.
     First the corner swelled into a small rounded tab instead (a panel in the shader,
     merged with the border): with a fillet on either side it read as a bulge, and one
     curve was wanted.
+    Since 2026-10-13 the corner is small and the light as far in it as it goes (the
+    user, with a picture of the large corner lying over a window's: "reduce the size of
+    this edge ... put the dot as far in the edge as possible and keep the effect"; the
+    windows had come closer to the frame that day). The light's middle is 7.5 px from
+    the screen's two edges, in the corner of the border itself, and the corner's radius
+    is 18 with notifications, read or not: what gives the light, 5.7 px at its widest,
+    3.9 px to the curve. Dot, breath and ripples are as they were. Seen on the real
+    desktop with one notification sent for it: calling, the ripples running out from
+    the corner, and read, the dot dim and still; the window's corner clear of the
+    frame's. With the light in the border, the pointer on it was on the strip that
+    brings the dock up (the user: "now the appbar opens when i hover over the
+    notification dot maybe give it a little bit more room"): the dock's strip now
+    begins 45 px from the screen's left edge on the screen that has the light
+    (`cornerRoom` in `Dock.qml`), as far as a click on the border opens the list
+    (`reach`). Not tested: the pointer there, a click on the light.
+  - Emptied while it is open, the list closes (2026-10-13; the user: "if we clear all
+    notifications the thing should close not stay open empty"): all cleared, or the
+    last one dismissed. Opened empty it stays, for the switch and the settings, so the
+    list has to have had something first (`hadSome` in `NotificationList.qml`; `empty`
+    is true for a moment while the list is made, and the first version closed it then,
+    whatever was in it). Tested on the real shell by IPC: opened empty, it stays;
+    opened with two and cleared, it closes. Not tested: the last one dismissed by its
+    own button.
   - A click there and the list grows out of the corner (`widgets/CornerPanel.qml`, a
     fifth panel in the shader), as the dock grows into the launcher.
     Escape or a click elsewhere closes it (it has the keyboard while open, like the
@@ -833,6 +851,17 @@ again, as if nothing had been installed.
 - **Popups** (critical only): up to 4, newest first. A card stays until closed, not
   expiring. They step aside while the palette is open, and show on the first screen
   only.
+- **The popups come out of the bottom left corner** (2026-10-13), where the light and
+  the list are, not from the top edge against the bar where they hung at first (the
+  user: "our important notifications should also be shown bottom left ... shown
+  immediately not only via dot ... instead of top right"). They are in the corner's
+  panel (`popping` in `Frame.qml`'s `notificationCorner`), which grows to the cards'
+  size and back; not while the list is open, which has them too. The top panel is
+  gone, its blob in the shader unused. Which ones pop up is as it was: critical ones.
+  Seen on the real desktop: a critical test notification as a card out of the corner,
+  the light beside it still calling; an ordinary one only lit the light. Not tested:
+  several at once, a click on a card or its buttons there, the list opened while one
+  is up.
 - **The card is Caelestia's in outline** (its `modules/notifications/Notification.qml`,
   read 2026-10-05):
   - **Icons: an application's own, in colour; a Tabler glyph where the system speaks.**
@@ -1166,6 +1195,27 @@ Plasma's task manager; the shell adds the gestures and keeps the list.
 - A click meant for the menu went into the user's window: the menu had closed while
   screenshots were taken to make sure it was open. A popup that grabs the focus does
   not outlast other programs; open it and click in one run of `pointer.py`.
+- **One icon per application** (2026-10-14; the user: "if we have multiple windows of
+  the same app ... can we group that somehow so we dont get the same icon multiple
+  times?"). The task list's own grouping (`groupMode: GroupApplications`,
+  `groupInline: false`): a row per application, its windows as the row's children,
+  so the order by application above is unchanged. With several windows there is a
+  3 px dot under the icon for each, up to four. A left click brings up the window that
+  was active last (`LastActivated`; the first if none was while the shell ran), and
+  the next one while one of them is active: no minimizing a group by a click. The menu
+  lists the windows first (title, shortened past 48 characters), then the usual
+  entries, "Close" becoming "Close All N Windows"; a middle click closes them all as
+  well. Activating and closing go to each window's own row, not the group's, whose
+  behaviour for those is the task list's to decide. Konsole has no "New Window": KDE
+  reports it cannot start a new instance, grouped or not.
+  - Tested in the hidden compositor (a copy of `shell/` with only the taskbar in a
+    window and test functions over IPC, `XDG_CONFIG_HOME` in a scratch directory):
+    two Konsoles and two and three KWrites as one icon each with their dots; clicks
+    cycling and coming back to the last active one; a window picked from the menu;
+    "New Window" from a group's menu; closing all (what a middle click calls). Clicks
+    were the click handler's logic called over IPC, not pointer events. Not tested: the
+    real dock on screen, the menu as a popup (its actions only), a group that is
+    dragged, a pinned application's launcher turning into a group.
 
 ## Themes: a file of colours, chosen by name
 
@@ -1496,25 +1546,6 @@ read again.
   and not the first. It reads its settings again by itself. The extensions that hold the
   colour themes are installed by `setup.sh` at the shell's start, once, not at a change
   of theme: an extension is a program.
-- **T3 Code** (2026-10-09) follows a theme the machine publishes: a file in
-  `<its data>/userdata/themes/` (`~/.local/share/t3`, or `T3CODE_HOME`), which its
-  server watches and hands to the open windows, so a change shows at once. The file's
-  name is what the theme is known by, so it is one file, `kde-quickshell.json`, written
-  again with each theme's colours and title. It carries two colours T3 Code makes a
-  whole palette from (the view and the accent) and, over that, the ones the theme has
-  a name for: view for the conversation, `bg` for the side bar, `viewAlternate` for
-  cards and the box one writes in, `surface` for borders and what is under the pointer,
-  the two text colours, error, warning, and the terminal's four. With only the two
-  colours the cards and the writing box came out blue on Solarized's cream. One's own
-  messages and the chosen row in the side bar were first left to T3 Code, which fills
-  them with a strong tint of the accent: with Melange Light's orange a loud peach
-  (`#ffb38a` or so; the user: "that orange in t3code is too bright"). They are
-  `selectionAlternate` now (2026-10-10), the pale selection KDE has, paler again. It is told once that this is the theme to wear
-  (`t3 theme set`, noted in `~/.local/state/kde-quickshell/t3code-told`): a theme
-  chosen in its own settings afterwards stands, and "kde-quickshell" is in the list
-  there to go back to. The file must be a real one; T3 Code does not read a link. All
-  of this is read out of the installed build (0.0.46 nightly; no documentation looked for), so
-  it may change under us.
 - **Browsers, Omarchy's way:** Chromium and what is made from it (Helium reads
   Chromium's directory) take `BrowserThemeColor`, the theme's `bg`, from machine policy
   (`/etc/chromium/policies/managed/kde-quickshell.json`), and a running browser takes it
@@ -1599,10 +1630,8 @@ KDE had rewritten it twice; Ghostty's tab bar before and after. For btop, VS Cod
 question for the password), the name in VS Code's settings and btop's theme file read;
 Helium's toolbar seen to lose its green; every theme's VS Code name checked against the
 colour themes the installed extensions and VS Code itself declare (three were wrong).
-Not seen on screen: VS Code and btop themselves. For T3 Code: the file written and
-`t3 theme show` naming it, the running window seen to turn to Solarized Light without a
-restart, and again after the surfaces were added; the file read with Everforest Light's
-colours after the user changed theme. Not seen on screen: a dark theme.
+Not seen on screen: VS Code and btop themselves. (T3 Code followed the theme too
+until 2026-10-14; see "AI chat: removed".)
 
 ## Lock screen: KDE's locker, the shell's interface
 
@@ -2102,171 +2131,37 @@ where the half-pixel offset is intended.
 A failed `import` kills the whole file. Widgets that import KDE modules live in their own
 file behind a `Loader`, with a visible error label on `Loader.Error`.
 
-## AI chat (T3 Code) in a panel of its own
+## AI chat: removed (2026-10-14)
 
-Meta+Space opens a native panel for T3 Code (`shell/Ai.qml`, `shell/ai/AiPanel.qml`),
-in two pages that take turns. Home: a composer for a new thread, and under it one
-list, every thread of the user's own, the ones that wait for an answer first, then the
-running ones, then what has ended unseen. Thread: the conversation and a field for a
-follow-up. It is the one shell action with a default key — `toggle-ai` with Meta+Space,
-an override of KRunner's (recorded per machine with `hotkeys.sh override`, like
-Meta+V), because the user asked for that key.
+From 2026-10-13 to 2026-10-14 there was a native panel for T3 Code (Meta+Space, a
+notch in the top edge with the number of threads at work, T3 Code following the
+shell's theme). Removed whole on 2026-10-14 (the user: "please remove all of our
+t3code work i dont like it ... i need to think more about how to integrate ai"):
+`Ai.qml`, `AiLink.qml`, `ai.sh`, `ai/`, `tools/t3-mock.py`, the T3 Code theme
+template and its part of `apply.sh`, the `toggle-ai` shortcut, the notch
+(`Theme.notchHeight`, `TopPanel.slide`, the binary dots' row in `Dots.qml`). Kept,
+being of use without it: the 18 px gap around maximized windows (see "Reserved
+space"), and `TopPanel`'s left edge that stays on the pixel grid while it changes
+width. `panel5` in `frame.frag` is unused (zero), like `panel3`.
 
-- **Native, not T3's web UI.** A web view cannot live in this process: QtWebEngine and
-  QtWebView both crash Quickshell at startup (Chromium: "Argument list is empty"),
-  reproduced three times in throwaway configs. A separate helper window was rejected
-  the same way: it could not merge into the frame. So the panel speaks T3's protocol
-  itself — bearer auth from the pairing exchange (`client_label: "kde quickshell"`,
-  token in `~/.config/kde-quickshell/ai.json`, mode 600), reads over HTTP, writes and
-  two streams over Effect RPC on `/ws` (see `Ai.qml`). All of it is read out of the
-  installed build (0.0.46 nightly), so it may change under us.
-- **One authorized client, on purpose.** Every pairing exchange creates a client in
-  T3's settings. The panel pairs once, stores the 30-day token and reuses it; the
-  probes that mapped the protocol created several "t3 pair" clients, revoked by hand
-  afterwards (a paired client lacks the `access:read` scope to revoke others).
-- **The panel needed a sixth shader blob** (`panel5` in `frame.frag`). Noted while
-  building: a rebuilt `.qsb` alone is not picked up on reload — the running process
-  keeps its compiled shader; a full restart of the shell is needed, or the new panel
-  silently gets no background.
-- **The first version showed a thread as it was when it was opened, and nothing
-  after** (2026-10-13; the user: "not happy with how it looks and works"). Three
-  causes, each enough by itself:
-  - A stream sends its next chunk only after the last one was acknowledged
-    (`{"_tag":"Ack","requestId":...}`). Never acknowledged, a stream is its first
-    chunk, the snapshot, and then silence. Found only against the real server: a
-    stand-in written from the build's schemas sent everything unasked.
-  - The thread over HTTP is `{ snapshotSequence, projection: { thread, ... } }`; the
-    panel looked for `thread` one level up and threw every answer away.
-  - A subagent's thread has an id with colons and per cent signs in it, which went
-    into the URL as it was: 404 for seventeen of the user's twenty threads.
-- **Streams, not polling.** `subscribeShell` gives every thread in short and each
-  change to one; `subscribeThread` gives one thread whole and then its events. A
-  `turn-item.updated` carries the item whole and is put in place, so an answer appears
-  as it is written; a `run.updated` likewise. Anything else asks for the thread again
-  once the stream has been quiet for a moment, not per event: a long thread is
-  megabytes (7.6 MB for 1317 items). The shell's stream sends a second "snapshot"
-  right after the first, with no threads in it and `resolvedRepositoryIdentityRoots`
-  beside it; it only says which projects' repositories are known. Taken for a list of
-  threads, it emptied the panel.
-- **The rows are a model that is changed, not a list that is replaced.** A JavaScript
-  array as a `ListView`'s model is rebuilt whole for every change, and the view was
-  put at its end each time: while the agent wrote, nothing above could be read. Now
-  the list stays at its end only while it is there (`follow` in `AiPanel.qml`); wheel
-  or PageUp away from it and it holds still.
-- **What the agent did between two messages is one row** ("3 commands, 1 edit · 4s"),
-  to be unfolded; while it is at it, the row is the step it is at. One row for each
-  step was a wall of grey lines with the answers lost in it. An answer is drawn block
-  by block: Qt's Markdown has no room between paragraphs and nothing behind code, so
-  each paragraph is a text of its own and each fenced block a card with a copy button.
-  Text can be selected; copying goes through `wl-copy`, as in the launcher.
-- **Subagents' threads are not listed.** T3 lists them like any other (`lineage.
-  parentThreadId` set, `creationSource: "provider"`); the list was mostly those, all
-  "Idle". A thread's state is not its `status` (only ever `idle` or a run's) but what
-  is made of it in `Ai.kindOf()`: waiting if there is a `pendingRuntimeRequest` or a
-  plan to accept, running if there is an `activeRunId`, done or failed if the last run
-  ended after `lastVisitedAt` (the panel says `thread.visit` when a thread is opened,
-  so T3's own window shows it as read too), else nothing.
-- **The selectors are lists, not buttons that step.** Each showed "▾" and went to the
-  next value at a click: eight projects, seven clicks. Their choices go into the one
-  list under the composer for as long as one is chosen from (Tab goes through them),
-  so there is one list and one way to move in it. They are for a new thread only; a
-  follow-up went out with the model chosen on the home page, whatever its thread had,
-  and now goes out with none, which T3 takes as the thread's own.
-- **The shell keeps the connection while the server is there**, panel open or not,
-  once it has been paired: a run that ends or waits for an answer is worth knowing
-  about then. `ai.sh notify` sends a notification as T3 Code's whose click opens the
-  panel on the thread (`notify-send --wait`, then `qs ipc --pid`): critical, so it
-  pops up, for one that waits; quiet for one that ended. Not for the thread on show.
-  A shell that was never paired asks nothing of anyone.
-- **The threads are two numbers in a notch in the top edge's middle**
-  (`ai/Notch.qml`), in binary, dots across as the clock's are down, the lowest at the
-  right, and two of them side by side as the clock has two. Right, five dots in the
-  accent: how many are at work. Left, three dots: in how many it is the user's turn,
-  one that has ended and has not been looked at (green, as in the list), or one that
-  waits for an answer and goes no further without it (then the warning's colour). It
-  is there only while one of the two is not 0. It was an icon in the bar first (a
-  sparkle that breathed while one ran, `modules/Agents.qml`), for a morning; the user:
-  "i dont want this here … i want it on the top as a binary thing like we have our
-  watch". Then one number, of the threads at work; the user: "we should also think
-  about how we can show when something is finished and waits for input". The notch is
-  the AI panel itself, let out as far as the dots need while it is closed
-  (`aiPanel.notch` in `Frame.qml`): no blob of its own in the shader, and the panel
-  grows out of it when it opens. The dots stay where they are when it does, at the
-  top of the open panel, whose content begins where the notch ends (the user: "we
-  should keep the binary dots visible when we open up the whole thing"); there they
-  show none as none. A click on the notch opens the panel, on the thread that waits
-  if exactly one does. It steps aside for the palette, which hangs in the same place.
-  `Dots.qml` got `across` for it. The panel grew out of the notch in jerks (the user:
-  "the animation is jagged when i click the notch … everything else is smooth"), for
-  two reasons that only show when a top panel changes its width while it is out,
-  which nothing did before. `TopPanel` put its left edge on a whole pixel at every
-  step, so the edge went in jumps of 3 px while the width changed evenly, and the
-  right edge forth and back by as much; now the edge is as far off a pixel all the
-  way as it needs to be at rest. And the panel's content was only made at the click,
-  so the panel first grew towards a guessed size and turned round when the content
-  had one; it is made while the notch is out. Worked out in figures, the edges'
-  positions for each width; the animation itself was not watched. It lay on a
-  maximized browser's tabs (the user:
-  "maximized windows … are not allowed to overlay the notch"), so the windows keep
-  clear of it: the gap between the frame and the windows has room for it, on every
-  side alike (see "Reserved space" at the top). The notch was as deep as its dots and
-  the room around them, 18 px (3 above the 9 px dots, 6 below). It is 9 now
-  (`Theme.notchHeight`): the dots begin 3 px up in the border, which is of the notch's
-  own stuff (`rise` in `Notch.qml`), and have 3 px under them. A panel keeps what is in
-  it off the border, so the dots are no longer in the AI panel but beside it in
-  `Frame.qml`, in its middle and moving with it (`TopPanel.slide`). The open panel's
-  content begins 6 px under the dots as before. Seen on the real desktop, the frame
-  solid at the time, in a picture of the top edge alone: the notch a shallow swelling,
-  its edge smooth, the dots across the border's line. Not seen: the notch on glass
-  (the blur along so shallow a curve), the notch coming out and going back, the open
-  panel under the dots, a click on the dots where they are in the border.
-- **At work is more than a run that is going.** A thread whose run has ended can have
-  a subagent, a command or a monitor of it still going (`pendingBackgroundTasks`);
-  T3's own window says "waiting" then, the panel "In the background", and it counts
-  as at work. Not counted at first: the notch was in while a subagent ran (the user:
-  "thats not true i have stuff working right now").
-- **More servers than this machine's** (2026-10-13). T3 Code's own window shows the
-  threads of other machines beside the local ones ("environments"); each is a server
-  of its own (the user's laptop, `air`, at its LAN and Tailscale addresses, port
-  3773), and the local server knows nothing of them. The window's pairings with them
-  are kept encrypted (`connection-catalog.json`, with a key from the wallet) and are
-  not taken: the shell is paired with such a server itself, as with the local one, a
-  client of its own there. `t3 pair` on that machine, then
-  `qs ipc call ai pair http://<host>:3773 <token>`: the server says who it is at
-  `/.well-known/t3/environment` (id and name, unasked), the token is exchanged, and
-  the server is kept in `ai.json` (`environments`). `shell/AiLink.qml` is one server:
-  session, reads, the socket and its two streams; `Ai.qml` has one for this machine
-  and one for each other, and its threads and projects are all of theirs, each
-  marked with its server. A thread is opened, written to and answered on its own
-  server, a new one started on its project's. `ai environments` lists them,
-  `ai forget <key>` drops one. Seen against two stand-in servers: pairing, a thread
-  started on the second from the panel, its approval answered there, the counts and
-  the notification ("air · mock"), the second server going and coming back. Not
-  seen: the real `air` (no token for it yet). The model for a new thread is one of
-  this machine's favourites also on another server, which may not have it.
-- An approval is answered in the panel (approve, approve for the session, decline),
-  and so is a question: an answer per question id, an option's label or words of
-  one's own, as T3's own window sends them (seen in an answered one). Neither was
-  tried against the real server, only against the stand-in below. Diffs,
-  attachments, the terminal and plans to accept stay in T3's own app.
-- **Testing.** `tools/t3-mock.py` is a stand-in server: the HTTP reads, the ticket,
-  the two streams with their acknowledgements, and a scripted run for every message
-  (one with "approve", "question" or "fail" in it does that). The panel was run
-  against it in a second Quickshell, off screen: a copy of `shell/` with `shell.qml`
-  replaced by a window holding `AiPanel` and an IPC handler that saves it as an image
-  (`grabToImage`), started with `QT_QPA_PLATFORM=offscreen`, `XDG_CONFIG_HOME` and
-  `T3CODE_HOME` in a scratch directory and a `notify-send` of its own first in `PATH`.
-  In that copy `Themes`, `Notifications`, `Launcher`, `CommandPalette` and `BarItems`
-  must be stand-ins: the real `Themes` sets the desktop's wallpaper, the real
-  `Notifications` takes the notification service from the running shell. Seen there:
-  home and every selector, a run from start to end, an approval, a question, a
-  failure, the server going and coming back, a thread of 1317 items (open in half a
-  second, 10 ms for each redraw of its rows), a dark theme, the notch's dots for one
-  and three threads and for one that waits. Seen in the running shell, against the
-  real server: the list, a thread, one run started with the panel closed that went
-  from running to finished in the list and sent its notification, and the notch in
-  the frame with one thread at work. Not tried with real keys: the home page's Down,
-  Tab and Escape. Not seen: the panel growing out of the notch, a click on it.
+What was learnt, for whatever comes next:
+
+- A web view cannot live in the shell's process: QtWebEngine and QtWebView both
+  crash Quickshell at startup (Chromium: "Argument list is empty"), reproduced three
+  times. A separate helper window could not merge into the frame. So it had to speak
+  T3's protocol itself (pairing token, HTTP reads, Effect RPC streams on `/ws`), read
+  out of a nightly build and liable to change under it.
+- Every pairing creates a client in T3's settings; reuse one token.
+- A stream sends its next chunk only after the last one was acknowledged; a stand-in
+  server written from the schemas did not, and hid that. Check a protocol assumption
+  against the real server.
+- A rebuilt `.qsb` shader is not picked up by a hot reload; restart the shell.
+- Left outside the repository by it: `~/.config/kde-quickshell/ai.json` (the paired
+  client's token; the client itself is in T3 Code's settings),
+  `~/.local/state/kde-quickshell/t3code-told`, and the theme file
+  `kde-quickshell.json` in T3 Code's `userdata/themes`, still chosen there.
+  Meta+Space is KRunner's again: the shortcut is unregistered and its override
+  dropped when the shell next starts (`hotkeys.sh register`).
 
 ## Glass: the frame half transparent, what is behind it blurred
 

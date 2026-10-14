@@ -206,16 +206,10 @@ Singleton {
     readonly property int barButtonHeight: 30
     readonly property int barSpacing: 0
     readonly property int dockHeight: 60
-    // How far the notch with the number of threads at work comes out of the
-    // top edge (ai/Notch.qml): less than its dots are high, which begin in
-    // the border.
-    readonly property int notchHeight: 9
     // Between the shell and the windows (Exclusions.qml): a maximized window
     // keeps this far from the border and the bar, and the desktop shows
-    // between. Room for the notch and a little more below it, and the same
-    // on every side, notch or not: the windows are framed evenly and do not
-    // move when the notch comes and goes.
-    readonly property int windowGap: notchHeight + 9
+    // between, the same on every side.
+    readonly property int windowGap: 18
     readonly property int popupWidth: 420
     readonly property int pillHeight: 24
     readonly property int iconSize: 18

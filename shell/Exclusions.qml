@@ -26,9 +26,6 @@ Scope {
         exclusiveZone: Theme.frameBorder + Theme.windowGap
     }
 
-    // the gap has room for the notch that comes out of this edge's middle
-    // while threads are at work (ai/Notch.qml): it would lie on a maximized
-    // window's tab bar
     Edge {
         anchors.top: true
         exclusiveZone: Theme.frameBorder + Theme.windowGap

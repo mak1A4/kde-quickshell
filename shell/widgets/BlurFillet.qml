@@ -5,7 +5,7 @@ import QtQuick
 // the border, as strips one pixel thick laid along the border's edge, each
 // as long as the fillet is wide there (BlurBlob.qml works them out). A
 // region has no curves but a circle's, and a fillet is an arc of a circle
-// only out of a deep panel: out of a shallow one (the notch) it is another
+// only out of a deep panel: out of a shallow one it is another
 // curve, and a circle in its place left glass without blur beside it, in
 // steps. There are as many strips as the widest fillet has pixels.
 Region {

@@ -31,17 +31,6 @@ Scope {
     // also if that is "none".
     readonly property var actions: [
         {
-            // Meta+Space, taken from KRunner while the shell runs (an
-            // override, like Meta+V below): 0x10000000 is Qt's Meta modifier
-            // and 0x20 is Space (see settings/keys.js). This is the one
-            // action with a default key, at the user's own request; every
-            // other action starts with none.
-            id: "toggle-ai",
-            name: "Toggle AI chat",
-            key: 0x10000020,
-            run: () => Ai.toggle(null)
-        },
-        {
             id: "toggle-launcher",
             name: "Toggle launcher",
             key: 0,

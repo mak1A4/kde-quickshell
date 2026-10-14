@@ -33,7 +33,6 @@ Singleton {
         screen = onScreen ?? Quickshell.screens[0] ?? null;
         Popouts.close();
         Launcher.hide();
-        Ai.hide();
         Notifications.listOpen = false;
         clips = [];
         mode = inMode ?? "clipboard";

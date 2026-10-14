@@ -2,7 +2,7 @@ import QtQuick
 import qs
 
 // The notifications to show right now, newest and most urgent first, as a
-// column of cards. The Frame hangs it from the top edge beside the bar.
+// column of cards. The Frame lets it out of the bottom left corner.
 // Which ones, how many and for how long is KDE's notification model's
 // business (see Service.qml).
 Item {

@@ -32,6 +32,20 @@ Item {
     // nothing at all to show
     readonly property bool empty: Notifications.groupNames.length === 0 && jobs.length === 0
 
+    // Emptied while it is open (all cleared, or the last one dismissed), the
+    // list closes: there is nothing left to do in it. Opened empty it stays,
+    // for the switch and the settings; so it has to have had something
+    // first (`empty` is also true for a moment while the list is made).
+    property bool hadSome: false
+
+    onEmptyChanged: {
+        if (!empty)
+            hadSome = true;
+        else if (hadSome)
+            Notifications.listOpen = false;
+    }
+    Component.onCompleted: hadSome = !empty
+
     implicitWidth: cardWidth + Theme.padding * 2
     implicitHeight: column.implicitHeight + Theme.padding * 2
 

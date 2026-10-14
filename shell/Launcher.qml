@@ -32,7 +32,6 @@ Singleton {
         screen = onScreen ?? Quickshell.screens[0] ?? null;
         Popouts.close();
         CommandPalette.hide();
-        Ai.hide();
         Notifications.listOpen = false;
         runner.active = true;
         query = text ?? "";

@@ -5,11 +5,10 @@ import qs.widgets
 // One column of the binary clock (BinaryTime.qml), flat: a dot for each bit
 // of `number`, the lowest at the bottom. A lit one is solid, an unlit one
 // smaller and faint, as the workspace switcher's dots are for desktops with
-// and without windows (modules/Workspaces.qml). With `across` it is a row,
-// the lowest at the right, as a number is written (ai/Notch.qml).
+// and without windows (modules/Workspaces.qml).
 //
 // What moves: a dot coming on swells a little past its size and settles; and
-// a wave, in which each dot in turn swells and settles, from the lowest on.
+// a wave, in which each dot in turn swells and settles, from the bottom up.
 // One runs when the number changes, and whenever wave() is called.
 Item {
     id: root
@@ -20,9 +19,6 @@ Item {
     required property color tint
     required property real dot
     required property real gap
-    // a row, not a column
-    property bool across: false
-    readonly property real length: dot * count + gap * (count - 1)
 
     signal waved
 
@@ -32,8 +28,8 @@ Item {
 
     onNumberChanged: wave()
 
-    implicitWidth: across ? length : dot
-    implicitHeight: across ? dot : length
+    implicitWidth: dot
+    implicitHeight: dot * count + gap * (count - 1)
 
     Repeater {
         model: root.count
@@ -47,11 +43,8 @@ Item {
             // by a wave going through
             property real swell: 1
 
-            // where the dot is along the column, from its far end, or the row
-            readonly property real along: root.length - root.dot - index * (root.dot + root.gap) + (root.dot - size) / 2
-
-            x: root.across ? along : (root.dot - size) / 2
-            y: root.across ? (root.dot - size) / 2 : root.height - root.length + along
+            x: (root.dot - size) / 2
+            y: root.height - root.dot - index * (root.dot + root.gap) + (root.dot - size) / 2
             width: size
             height: size
             radius: size / 2
