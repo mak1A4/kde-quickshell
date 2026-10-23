@@ -14,6 +14,11 @@
 #       runs: remembers it, and applies it now if the shell is running.
 #   hotkeys.sh drop <component> <action>
 #       Forgets the overrides of <action>; their owners get their keys back.
+#   hotkeys.sh off <component>
+#       The shell switched off (switch.sh off): the keys noted, the actions
+#       taken out of KDE, the owners of overridden keys switched on. The
+#       overrides stay noted. At the next start the keeper gives the actions
+#       their keys again.
 #
 # An override does not take the key away from its owner. The owner keeps it
 # in KDE's settings and is only switched off (inactive) while the shell runs,
@@ -26,6 +31,9 @@
 # owner action, separated by tabs.
 
 overrides="${XDG_CONFIG_HOME:-$HOME/.config}/kde-quickshell/shortcut-overrides.tsv"
+# the keys of the actions while the shell is switched off: action, then its
+# keys, separated by tabs
+noted="${XDG_CONFIG_HOME:-$HOME/.config}/kde-quickshell/shortcut-keys.tsv"
 tab=$(printf '\t')
 
 accel() {
@@ -109,10 +117,44 @@ keep() {
     exec 9> "$dir/kde-quickshell-hotkeys.lock"
     flock 9
     register "$@"
+    give_back "$1"
     apply_all "$1"
     tail --pid="$shell" -f /dev/null
     release_all "$1"
     rm -f "$dir/kde-quickshell-hotkeys.$shell.lock"
+}
+
+# What switch.sh off took out of KDE: back with the keys it had. Once:
+# after that KDE keeps them again.
+give_back() {
+    [ -f "$noted" ] || return 0
+    while IFS=$tab read -r action keys; do
+        [ -n "$action" ] || continue
+        count=0
+        list=
+        for key in $(printf '%s' "$keys" | tr '\t' ' '); do
+            count=$((count + 1))
+            list="$list 4 $key 0 0 0"
+        done
+        accel setForeignShortcutKeys 'asa(ai)' 4 "$1" "$action" "" "" "$count" $list
+    done < "$noted"
+    rm -f "$noted"
+}
+
+# switch.sh off: see the top
+off() {
+    path=/component/$(printf %s "$1" | tr -c 'A-Za-z0-9' '_')
+    infos=$(busctl --user --json=short call org.kde.kglobalaccel "$path" org.kde.kglobalaccel.Component allShortcutInfos 2> /dev/null) || return 0
+    mkdir -p "$(dirname "$noted")"
+    printf '%s' "$infos" | jq -r '.data[0][] | select((.[6] | length) > 0) | [.[0]] + (.[6] | map(tostring)) | join("\t")' > "$noted"
+    [ -s "$noted" ] || rm -f "$noted"
+    for action in $(actions_of "$1"); do
+        accel unregister ss "$1" "$action" > /dev/null
+    done
+    [ -f "$overrides" ] || return 0
+    while IFS=$tab read -r action key owner owner_action; do
+        [ -n "$owner_action" ] && restore "$owner" "$owner_action"
+    done < "$overrides"
 }
 
 # Forgets the overrides of one action, except those for the key given (if
@@ -157,5 +199,6 @@ case $command in
     keep) keep "$@" ;;
     override) override "$@" ;;
     drop) drop "$@" ;;
+    off) off "$@" ;;
     *) echo "hotkeys.sh: unknown command '$command'" >&2; exit 2 ;;
 esac

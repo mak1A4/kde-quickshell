@@ -12,7 +12,8 @@
 #   login.sh greeter                      "yes" if there is such a login screen
 #   login.sh declined <state>             not to be asked for this state again
 #   login.sh apply <config dir> <state>   as root: does it
-#   login.sh undo                         as root: takes it all away
+#   login.sh undo                         as root: takes it all away, also
+#                                         the settings copied to the login screen
 #
 # What `apply` does:
 #   - installs the shell's wallpaper (../plasma/background) for everyone;
@@ -223,7 +224,23 @@ undo)
     for dir in chromium opt/chrome opt/edge brave; do
         rm -f "$sys/etc/$dir/policies/managed/kde-quickshell.json"
     done
-    echo "the login screen has Plasma's own wallpaper again; its copied settings are reset in System Settings, Login Screen"
+    # the settings copied to the login screen: its own defaults again, as
+    # before anything was applied (System Settings, Login Screen, "Apply
+    # Plasma Settings" copies them again, without the shell)
+    if there; then
+        if [ -n "$sys" ]; then
+            home="$sys/var/lib/plasmalogin"
+        else
+            home=$(getent passwd "$greeter" | cut -d: -f6)
+        fi
+        if [ -n "$home" ] && [ -d "$home/.config" ]; then
+            for file in $synced; do
+                rm -f "$home/.config/$file"
+            done
+            rm -rf "$home/.cache"
+        fi
+    fi
+    echo "the login screen has Plasma's own wallpaper and settings again"
     ;;
 
 *)

@@ -9,6 +9,8 @@
 #
 #   panels.sh keep <shell pid> <directory with the two KWin scripts>
 #   panels.sh hide-icons | show-icons     the second part by hand
+#   panels.sh show-panels                 the panels back, by hand (switch.sh
+#                                         off, should the keeper be gone)
 #
 # Like the keeper for the shortcuts (hotkeys.sh): one per shell process, and
 # a restarted shell's keeper waits for the previous one to finish, so that
@@ -81,6 +83,13 @@ show_icons() {
         print('shown');" > /dev/null && rm -f "$before"
 }
 
+show_panels() {
+    scripting unloadScript s "$park" > /dev/null
+    load "$unpark" "$1/unpark-panels.js"
+    sleep 1
+    scripting unloadScript s "$unpark" > /dev/null
+}
+
 keep() {
     shell=$1; scripts=$2
     dir=${XDG_RUNTIME_DIR:-/tmp}
@@ -96,10 +105,7 @@ keep() {
     done
     tail --pid="$shell" -f /dev/null
     show_icons
-    scripting unloadScript s "$park" > /dev/null
-    load "$unpark" "$scripts/unpark-panels.js"
-    sleep 1
-    scripting unloadScript s "$unpark" > /dev/null
+    show_panels "$scripts"
     rm -f "$dir/kde-quickshell-panels.$shell.lock"
 }
 
@@ -108,5 +114,6 @@ case $command in
     keep) keep "$@" ;;
     hide-icons) hide_icons ;;
     show-icons) show_icons ;;
+    show-panels) show_panels "$1" ;;
     *) echo "panels.sh: unknown command '$command'" >&2; exit 2 ;;
 esac

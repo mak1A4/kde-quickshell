@@ -1781,6 +1781,66 @@ something other than this shell is pointed at it.
 Tested: the generated unit started by hand, the shell up and answering IPC. Not tested:
 a login.
 
+The entry's text is `packaging/kde-quickshell-shell.desktop` (2026-10-14), filled in by
+`setup.sh` and by `switch.sh on` alike.
+
+## Switched off and on as a whole: `switch.sh`
+
+Asked for on 2026-10-14 (the user: "i want to be able to disable the shell anytime and
+nothing should be left when this is done and it should be easy to re-enable everything
+again"), after the shell had been stopped by hand and a dozen things were still the
+shell's: KDE's colours, the lock screen, the login screen, the window decoration,
+btop's and VS Code's themes, GTK's style sheet, the terminals' colours, the browser
+helper, plugins in Qt's directory.
+
+- **`switch.sh off`** (in the repository's root, or "Switch the shell off" among the
+  ">" actions, which runs it in a scope of its own and tells the outcome in a
+  notification) stops the shell, waits for its keepers to give back Plasma's panels,
+  desktop icons and shortcuts, and then takes away everything the shell put outside
+  itself: the autostart entry and its unit's drop-in, the shortcuts (out of KDE, see
+  below), the rounded corners, the background wallpaper and the desktop's and lock
+  screen's own wallpaper back, the lock screen and its drop-in, KDE's colour scheme and
+  icons back and the shell's colour schemes deleted, the calendar's holidays if the
+  shell chose them, GTK's import, btop's and VS Code's theme back, the VS Code
+  extensions it installed, the notification helper, the desktop entry for the window
+  list, its data and cache directories, and its notes of what was before. Root's part
+  (the login screen and what `login.sh apply` copied for it, the browsers' policy and
+  helper, the corners' plugins) in one `pkexec` of `switch.sh root-off`, only if any of
+  it is there.
+- **What stays is the shell's own**: `~/.config/kde-quickshell` (the theme chosen, the
+  dock, the launcher, shortcut overrides, one's own themes and backgrounds) and
+  Quickshell's state directory for this shell (notification history, the launcher's
+  counts). Nothing but the shell reads them; they are what makes `on` the same shell.
+- **`switch.sh on`** makes the autostart entry (unless `setup.json` says
+  `"autostart": false`), installs the desktop entry for the window list first (KWin
+  asks for it when the program starts; from inside the shell it would count only from
+  the next start) and starts the shell. The shell puts the rest back as at its first
+  start: setup.sh, the theme (ThemeExport, apply.sh), the background, the notification
+  helper, the login screen (asks for the password). The rounded corners are switched on
+  again if they were on (noted in `~/.config/kde-quickshell/switched-off`).
+- **What was before is noted where it is changed, once**: `colorscheme-before`
+  (apply.sh, already), `icons-before`, `btop-before` and `vscode-before` (apply.sh),
+  `holidays-set` and `vscode-installed` (setup.sh), `wallpaper-before`
+  (background.sh). Where nothing was noted, `off` takes KDE's default: Breeze Light,
+  btop's "Default", VS Code without theme settings.
+- **Shortcuts**: `hotkeys.sh off` notes each action's keys in
+  `~/.config/kde-quickshell/shortcut-keys.tsv`, unregisters the actions (KDE forgets
+  them, and they are no longer listed in System Settings), and switches on again what
+  they overrode. The overrides stay noted. At the next start the keeper gives the
+  actions their keys back once (`give_back`), then the overrides apply as ever.
+- `switch.sh status` says on, on but not running, or off.
+- Tested on 2026-10-14 on the real desktop, with the shell already stopped and much of
+  it already undone by hand: `off` removed everything listed above that was still
+  there, root's part through the password prompt, and left
+  `~/.config/kde-quickshell` with the shortcuts' keys noted (`toggle-launcher` Meta,
+  `show-clipboard` Meta+V) and `corners=on` (written by hand: the corners had been
+  switched off by hand before). The shortcuts' round trip with a component of its own
+  (`kqs-test`) and a scratch configuration: a key set, `off`, the component empty, the
+  keeper of a next start, the key back. `login.sh undo` against a scratch root. Not
+  tested: `on` (the shell was to stay off), `off` with the shell running, the ">"
+  action, the notes made by apply.sh and setup.sh (they are written at the next
+  change of theme and the next start).
+
 ## Testing the pointer: a virtual pointing device
 
 `tools/pointer.py` is the counterpart of `tools/keys.py` for the mouse: an absolute
@@ -2156,12 +2216,10 @@ What was learnt, for whatever comes next:
   server written from the schemas did not, and hid that. Check a protocol assumption
   against the real server.
 - A rebuilt `.qsb` shader is not picked up by a hot reload; restart the shell.
-- Left outside the repository by it: `~/.config/kde-quickshell/ai.json` (the paired
-  client's token; the client itself is in T3 Code's settings),
-  `~/.local/state/kde-quickshell/t3code-told`, and the theme file
-  `kde-quickshell.json` in T3 Code's `userdata/themes`, still chosen there.
-  Meta+Space is KRunner's again: the shortcut is unregistered and its override
-  dropped when the shell next starts (`hotkeys.sh register`).
+- What it left outside the repository was removed the same day: the token in
+  `~/.config/kde-quickshell/ai.json`, `t3code-told`, and the theme file in T3 Code's
+  `userdata/themes` (`t3 theme clear` first). The paired client "kde quickshell" is
+  still listed in T3 Code's settings, to revoke there. Meta+Space is KRunner's again.
 
 ## Glass: the frame half transparent, what is behind it blurred
 

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Quickshell shell
+Comment=Frame, bar, dock, launcher and command palette (kde-quickshell)
+Icon=preferences-desktop-theme-global
+# -n: a start while it already runs does nothing. The path is the one
+# `qs ipc -p` is called with; it must be exactly this.
+# (The autostart entry, made from this by shell/setup.sh and switch.sh on.)
+Exec=@QS@ -n -p @SHELL@
+OnlyShowIn=KDE;
+X-KDE-autostart-phase=2

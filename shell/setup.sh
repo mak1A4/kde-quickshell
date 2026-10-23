@@ -103,18 +103,7 @@ elif [ -e "$state/autostart-made" ]; then
     say note autostart "Started at login" "no: the entry was removed, and is not put back (delete $state/autostart-made to have it again)"
 else
     mkdir -p "$(dirname "$autostart")"
-    cat > "$autostart" << EOF
-[Desktop Entry]
-Type=Application
-Name=Quickshell shell
-Comment=Frame, bar, dock, launcher and command palette (kde-quickshell)
-Icon=preferences-desktop-theme-global
-# -n: a start while it already runs does nothing. The path is the one
-# \`qs ipc -p\` is called with; it must be exactly this.
-Exec=$(command -v qs) -n -p $given
-OnlyShowIn=KDE;
-X-KDE-autostart-phase=2
-EOF
+    sed "s|@QS@|$(command -v qs)|; s|@SHELL@|$given|" "$root/packaging/kde-quickshell-shell.desktop" > "$autostart"
     : > "$state/autostart-made"
     say fixed autostart "Started at login" "entry made in $autostart"
 fi
@@ -296,6 +285,8 @@ if have code; then
             printf '%s\n' "$there" | grep -qx "$extension" && continue
             if code --install-extension "$extension" > /dev/null 2>&1; then
                 added="$added $extension"
+                # for switch.sh off, which removes what was installed here
+                echo "$extension" >> "$state/vscode-installed"
             else
                 failed="$failed $extension"
             fi
@@ -342,6 +333,8 @@ else
     fi
     if [ -n "$region" ]; then
         kwriteconfig6 --file plasma_calendar_holiday_regions --group General --key selectedRegions "$region"
+        # the shell's choice, which switch.sh off takes back
+        : > "$state/holidays-set"
         say fixed holidays "Holidays in the calendar" "those of $region, as the dates are formatted for $format (selectedRegions in ~/.config/plasma_calendar_holiday_regions says which)"
     else
         say note holidays "Holidays in the calendar" "no set of holidays found for ${format:-the system's date format}${known:+ among KDE's}; the language's country's are shown"

@@ -486,6 +486,12 @@ Singleton {
             subtitle: "Reload this shell's configuration",
             icon: "view-refresh-symbolic",
             reload: true
+        },
+        {
+            title: "Switch the shell off",
+            subtitle: "KDE as it was without it, until switch.sh on; may ask for the password",
+            icon: "system-shutdown-symbolic",
+            switchOff: true
         }
     ]).concat(Setup.open.map(item => ({
                 title: "Setup: " + item.title,
@@ -660,8 +666,16 @@ Singleton {
             LoginScreen.check(true);
         else if (action.setup)
             Setup.check(true);
+        else if (action.switchOff)
+            switchOff();
         else
             SessionActions.runWithPrompt(action.session);
+    }
+
+    // switch.sh in the repository, in a scope of its own: it stops the
+    // shell's unit, and would be ended with it
+    function switchOff() {
+        Quickshell.execDetached(["sh", "-c", 'if command -v systemd-run > /dev/null; then exec systemd-run --user --scope --quiet -- "$@"; else exec "$@"; fi', "sh", "sh", Quickshell.shellDir.replace(/[^\/]+\/?$/, "switch.sh"), "off"]);
     }
 
     // The settings are a program of their own, an ordinary KDE window: the

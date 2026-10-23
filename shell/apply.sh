@@ -40,6 +40,7 @@ data="${XDG_DATA_HOME:-$HOME/.local/share}"
 config="${XDG_CONFIG_HOME:-$HOME/.config}"
 state="${XDG_STATE_HOME:-$HOME/.local/state}/kde-quickshell"
 quiet=${APPLY_ONLY_FILES:-}
+tab=$(printf '\t')
 
 value() {
     jq -r --arg name "$1" '.[$name] // ""' "$values"
@@ -93,6 +94,8 @@ if [ -z "$quiet" ]; then
         light:*-Dark) wanted="${icons%-Dark}-Light" ;;
     esac
     if [ "$wanted" != "$icons" ] && { [ -d "/usr/share/icons/$wanted" ] || [ -d "$data/icons/$wanted" ]; }; then
+        # what KDE had before, for switch.sh off
+        [ -e "$state/icons-before" ] || { mkdir -p "$state"; echo "$icons" > "$state/icons-before"; }
         /usr/lib/plasma-changeicons "$wanted" > /dev/null 2>&1 || true
     fi
 fi
@@ -154,7 +157,11 @@ if command -v btop > /dev/null; then
         render btop.theme.tpl "$theme" && retinted=1
     fi
     # btop is told once which theme is its own; it writes the rest of its
-    # configuration itself
+    # configuration itself. What it had before is noted for switch.sh off.
+    if [ ! -e "$state/btop-before" ] && ! grep -q '^color_theme = "kde-quickshell"' "$config/btop/btop.conf" 2> /dev/null; then
+        mkdir -p "$state"
+        sed -n 's/^color_theme = "\(.*\)"$/\1/p' "$config/btop/btop.conf" 2> /dev/null > "$state/btop-before"
+    fi
     if [ ! -e "$config/btop/btop.conf" ]; then
         echo 'color_theme = "kde-quickshell"' > "$config/btop/btop.conf"
     elif ! grep -q '^color_theme = "kde-quickshell"' "$config/btop/btop.conf"; then
@@ -179,6 +186,12 @@ if [ -n "$label" ]; then
         new=$(mktemp)
         cp "$settings" "$new"
         for key in workbench.colorTheme workbench.preferredDarkColorTheme workbench.preferredLightColorTheme; do
+            # what it was, once, for switch.sh off: "-" for none
+            if ! grep -qsF "$settings$tab$key$tab" "$state/vscode-before"; then
+                was=$(sed -n -E "s|.*\"$key\"[[:space:]]*:[[:space:]]*\"([^\"]*)\".*|\\1|p" "$settings" | head -1)
+                mkdir -p "$state"
+                printf '%s\t%s\t%s\n' "$settings" "$key" "${was:--}" >> "$state/vscode-before"
+            fi
             if grep -q "\"$key\"" "$new"; then
                 sed -i -E "s|(\"$key\"[[:space:]]*:[[:space:]]*)\"[^\"]*\"|\\1\"$label\"|" "$new"
             else
